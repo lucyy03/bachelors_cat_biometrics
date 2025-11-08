@@ -1,0 +1,194 @@
+@use 'animations';
+
+@import url('https://fonts.googleapis.com/css2?family=Merienda:wght@300..900&family=Shrikhand&display=swap');
+ 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply gradient-background min-h-screen
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #222;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  /*background-color: #fff;*/
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, button {
+  font-family: "Merienda", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+#app {
+  width: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+.card {
+  padding: 2em;
+}
+
+.container {
+  margin: 0 auto;
+}
+
+button {
+  padding: .8em 0.5em;
+  width: 350px;
+  background-color: #950cde;
+  color: #fff;
+  border: 3px solid #950cde;
+  text-transform: uppercase;
+  transition: .2s;
+  display: flex;
+  gap: 1em;
+  align-items: center;
+  justify-content: center;
+
+  &.large {
+    padding: 1.5em 0.6em;
+  }
+
+  &.small {
+    padding: .5em 0.6em;
+    text-transform: none;
+  }
+
+  &:hover {
+    background-color: #7300b0;
+    border-color: #7300b0;
+  }
+
+  &.secondary {
+    background-color: white;
+    color: #950cde;
+
+    &:hover {
+      background-color: rgba(149, 12, 222, 0.05);
+    }
+  }
+
+  &.text {
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  svg {
+    font-size: 1.1em;
+  }
+
+  &.mini {
+    gap: 10px;
+    width: auto;
+    padding: .3em 1.5em;
+    border-radius: 15px;
+
+    &:hover {
+      letter-spacing: inherit;
+    }
+  }
+
+  &.danger {
+    background-color: rgb(254 202 202);
+    border-color: rgb(252 165 165);
+    color: #222;
+
+    &:hover {
+      background-color: rgb(252 165 165);
+    }
+  }
+
+  &.disabled {
+    background-color: #f8f8f8;
+
+    &:hover {
+      background-color: #f8f8f8;
+      cursor: unset;
+    }
+  }
+}
+
+.gradient-background {
+  background: rgba(217, 217, 217, 1);
+  background: -moz-radial-gradient(center, ellipse cover, rgba(217, 217, 217, 1) 0%, rgba(158, 127, 199, 1) 100%);
+  background: -webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(0%, rgba(217, 217, 217, 1)), color-stop(100%, rgba(158, 127, 199, 1)));
+  background: -webkit-radial-gradient(center, ellipse cover, rgba(217, 217, 217, 1) 0%, rgba(158, 127, 199, 1) 100%);
+  background: -o-radial-gradient(center, ellipse cover, rgba(217, 217, 217, 1) 0%, rgba(158, 127, 199, 1) 100%);
+  background: -ms-radial-gradient(center, ellipse cover, rgba(217, 217, 217, 1) 0%, rgba(158, 127, 199, 1) 100%);
+  background: radial-gradient(ellipse at center, rgba(217, 217, 217, 1) 0%, rgba(158, 127, 199, 1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#d9d9d9', endColorstr='#9e7fc7', GradientType=1);
+}
+
+.center-child {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .centered-card {
+    @apply px-10 py-8 w-3/6 bg-white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+    h1 {
+      @apply mb-6;
+    }
+
+    &--mini {
+      @apply w-2/6
+    }
+  }
+}
+
+.link-button {
+  @apply hover:underline font-semibold;
+  color: #950cde;
+
+  &:hover {
+    color: #7500b0;
+  }
+}
+
+.content {
+  @apply w-full py-16 relative;
+  min-height: calc(100vh - 168px - 64px);
+
+  &.without-title {
+    min-height: calc(100vh - 72px - 64px);
+  }
+
+  z-index: 1;
+  background: rgba(235, 228, 245, 1);
+  background: -moz-linear-gradient(top, rgba(235, 228, 245, 1) 0%, rgba(255, 255, 255, 1) 19%, rgba(255, 255, 255, 1) 100%);
+  background: -webkit-gradient(left top, left bottom, color-stop(0%, rgba(235, 228, 245, 1)), color-stop(19%, rgba(255, 255, 255, 1)), color-stop(100%, rgba(255, 255, 255, 1)));
+  background: -webkit-linear-gradient(top, rgba(235, 228, 245, 1) 0%, rgba(255, 255, 255, 1) 19%, rgba(255, 255, 255, 1) 100%);
+  background: -o-linear-gradient(top, rgba(235, 228, 245, 1) 0%, rgba(255, 255, 255, 1) 19%, rgba(255, 255, 255, 1) 100%);
+  background: -ms-linear-gradient(top, rgba(235, 228, 245, 1) 0%, rgba(255, 255, 255, 1) 19%, rgba(255, 255, 255, 1) 100%);
+  background: linear-gradient(to bottom, rgba(235, 228, 245, 1) 0%, rgba(255, 255, 255, 1) 19%, rgba(255, 255, 255, 1) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ebe4f5', endColorstr='#ffffff', GradientType=0);
+}
