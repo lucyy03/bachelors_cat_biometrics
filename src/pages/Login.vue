@@ -27,22 +27,36 @@
   </div>
 </template>
 
-<script setup>
-import { reactive, computed } from 'vue'
+<script lang="ts">
+import { reactive, computed, defineComponent } from 'vue'
+import { useRouter } from 'vue-router';
+import { useManualAuth } from '../utils/manualAuth';
 
-const form = reactive({
-  email: '',
-  password: ''
-})
+export default defineComponent({
+	name: 'LoginPage',
+	setup() {
+		const router = useRouter();
+		const { login: manualLogin } = useManualAuth();
 
-// computed na kontrolu, či sú obidve polia vyplnené
-const isFormValid = computed(() => form.email && form.password)
+		// holds form state for simple manual login
+		const form = reactive({
+			email: '',
+			password: ''
+		});
 
-function onLogin() {
-  if (!isFormValid.value) return alert('Please fill in both fields 🐾')
-  console.log('Login data:', form)
-  alert('Frontend login complete 👍 (no backend yet).')
-}
+		// computed validation for enabling the submit button
+		const isFormValid = computed(() => !!form.email && !!form.password);
+
+		async function onLogin() {
+			// manual auth: set the localStorage flag and proceed
+			manualLogin();
+      alert('Successfully logged in');
+			router.push({ name: 'NewCatForm' });
+		}
+
+		return { form, isFormValid, onLogin };
+	}
+});
 </script>
 
 <style scoped>

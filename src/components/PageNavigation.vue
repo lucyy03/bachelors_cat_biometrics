@@ -2,18 +2,24 @@
 import { ref, computed, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../utils/useAuth'
+import { useManualAuth } from '../utils/manualAuth'
 
-// vynechali sme signInWithGoogle, nechávame len login/logout routing
+// firebase auth
 const { user, signOutUser, getUserData, isUserPermitted } = useAuth()
+
+// manual auth
+const { isLoggedIn: manualLoggedIn, logout: manualLogout } = useManualAuth()
 
 const route = useRoute()
 const isHomePage = computed(() => route.path === '/')
 
-// sleduje rolu používateľa
+// whether ANY login method is active
+const isLoggedIn = computed(() => !!user.value || manualLoggedIn.value)
+
+// user role stuff (firebase only)
 const userRole = ref<string | null>(null)
 const isPermitted = ref<boolean>(false)
 
-// sleduj zmeny usera a nastav rolu
 watchEffect(async () => {
 	if (user.value) {
 		const userData = await getUserData(user.value.uid)
@@ -27,9 +33,19 @@ watchEffect(async () => {
 	}
 })
 
-// computed pre admina
 const isAdmin = computed(() => userRole.value === 'ADMIN')
+
+// logout chooses correct method
+function logout() {
+	if (user.value) {
+		signOutUser()           // firebase logout
+	} else if (manualLoggedIn.value) {
+		manualLogout()          // manual logout
+		alert('Logged out')     // match your manual login alert style
+	}
+}
 </script>
+
 
 <template>
 	<nav class="container">
@@ -62,7 +78,7 @@ const isAdmin = computed(() => userRole.value === 'ADMIN')
 		</router-link>
 
 		<!-- Ak je user prihlásený, zobraz Log out -->
-		<div v-if="user" @click="signOutUser" class="nav-item hover-underline-animation">
+		<div v-if="isLoggedIn" @click="logout" class="nav-item hover-underline-animation">
 			Log out
 		</div>
 
