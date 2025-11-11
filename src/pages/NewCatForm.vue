@@ -402,6 +402,10 @@ export default defineComponent({
 </template>
 
 <style scoped lang="scss">
+/* add this at the very top of the style block so every build has the var */
+:global(:root){ --header-h:72px; }
+
+/* colors */
 $page-bg: #cdb3db; // lavender backdrop
 $card-bg: #e7e3ea; // light panel
 $heading: #2f2b2f;
@@ -416,7 +420,8 @@ $accent-dark: #a172cc;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 2rem;
+	/* previously: padding: 2rem; */
+	padding: calc(var(--header-h) + 2rem) 2rem 2rem;
 }
 
 .center-child {
@@ -601,5 +606,10 @@ $accent-dark: #a172cc;
 /* responsive guard to keep left column tidy on small screens */
 @media (max-width: 860px) {
 	.photo-pane, .zoom-controls, .photo-frame { width: 100%; max-width: 360px; }
+}
+
+/* optional guard on short viewports to avoid weird vertical centering */
+@media (max-height: 740px){
+	.page-bg{ align-items:flex-start; }
 }
 </style>
