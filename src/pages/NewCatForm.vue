@@ -40,6 +40,10 @@ export default defineComponent({
 			gender: '',
 			origin: '',
 			comment: '',
+			//note:framing values persisted with the cat
+			imagePosX: 50, //note:0..100 background-position x
+			imagePosY: 50, //note:0..100 background-position y
+			imageScale: 1   //note:1..3 background-size multiplier
 		};
 
 		return {
@@ -80,8 +84,28 @@ export default defineComponent({
 			isLoading: false,
 			initFormData,
 			user,
-			signInWithGoogle
+			signInWithGoogle,
+
+			//note:drag state
+			isDragging: false,
+			lastX: 0,
+			lastY: 0,
+			minScale: 1,
+			maxScale: 3
 		};
+	},
+
+	computed: {
+		previewStyle() {
+			if (!this.imagePreviewUrl) return {};
+			//note:simple background-based pan+zoom
+			return {
+				backgroundImage: `url(${this.imagePreviewUrl})`,
+				backgroundRepeat: 'no-repeat',
+				backgroundSize: `${this.formData.imageScale * 100}% auto`,
+				backgroundPosition: `${this.formData.imagePosX}% ${this.formData.imagePosY}%`
+			};
+		}
 	},
 
 	watch: {
@@ -89,6 +113,10 @@ export default defineComponent({
 			if (newFile) {
 				this.imagePreviewUrl = URL.createObjectURL(newFile);
 				this.imageFile = newFile;
+				//note:reset framing for new image
+				this.formData.imagePosX = 50;
+				this.formData.imagePosY = 50;
+				this.formData.imageScale = 1;
 			}
 		}
 	},
@@ -104,9 +132,77 @@ export default defineComponent({
 			this.imagePreviewUrl = '';
 		},
 
+		startDrag(e) {
+			//note:start panning
+			this.isDragging = true;
+			const p = this._point(e);
+			this.lastX = p.x;
+			this.lastY = p.y;
+		},
+
+		onDrag(e) {
+			if (!this.isDragging) return;
+			const frame = this.$refs.photoFrame;
+			if (!frame) return;
+			const rect = frame.getBoundingClientRect();
+			const p = this._point(e);
+
+			const dx = p.x - this.lastX;
+			const dy = p.y - this.lastY;
+
+			//note:convert px to % of frame; direction matches finger
+			const nx = this.formData.imagePosX - (dx / rect.width) * 100;
+			const ny = this.formData.imagePosY - (dy / rect.height) * 100;
+
+			this.formData.imagePosX = Math.max(0, Math.min(100, nx));
+			this.formData.imagePosY = Math.max(0, Math.min(100, ny));
+
+			this.lastX = p.x;
+			this.lastY = p.y;
+		},
+
+		endDrag() { this.isDragging = false; },
+
+		onWheel(e) {
+			//note:zoom around center for simplicity
+			const dir = e.deltaY > 0 ? -1 : 1;
+			const factor = dir > 0 ? 1.1 : 1/1.1;
+			this.setScale(this.formData.imageScale * factor);
+		},
+
+		recenterAtClick(e) {
+			//note:double click/tap to center under cursor
+			const frame = this.$refs.photoFrame;
+			if (!frame) return;
+			const rect = frame.getBoundingClientRect();
+			const p = this._point(e);
+			const rx = ((p.x - rect.left) / rect.width) * 100;
+			const ry = ((p.y - rect.top) / rect.height) * 100;
+			this.formData.imagePosX = Math.max(0, Math.min(100, rx));
+			this.formData.imagePosY = Math.max(0, Math.min(100, ry));
+		},
+
+		zoomIn() { this.setScale(this.formData.imageScale * 1.2); },
+		zoomOut() { this.setScale(this.formData.imageScale / 1.2); },
+		resetView() {
+			this.formData.imagePosX = 50;
+			this.formData.imagePosY = 50;
+			this.formData.imageScale = 1;
+		},
+
+		setScale(v) {
+			//note:clamp and keep position within 0..100 (background won't show gaps)
+			this.formData.imageScale = Math.max(this.minScale, Math.min(this.maxScale, v));
+		},
+
+		_point(e) {
+			//note:unified pointer
+			if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+			return { x: e.clientX, y: e.clientY };
+		},
+
 		async submitForm() {
-			// allow either manual or firebase-permitted users
-			// note:no space after comment marker per your style guide
+			//note:allow either manual or firebase-permitted users
 			if (!this.manualLoggedIn) {
 				const permitted = await isUserPermitted();
 				if (!permitted) {
@@ -124,14 +220,7 @@ export default defineComponent({
 
 			try {
 				const storage = getStorage();
-
-				// note:kept conservative compression
-				const options = {
-					maxSizeMB: 3,
-					maxWidthOrHeight: 1920,
-					useWebWorker: true,
-				};
-
+				const options = { maxSizeMB: 3, maxWidthOrHeight: 1920, useWebWorker: true };
 				const compressedFile = await imageCompression(this.imageFile, options);
 				const storageRef = firebaseStorageRef(storage, `cats/${compressedFile.name}`);
 				const snapshot = await uploadBytes(storageRef, compressedFile);
@@ -180,14 +269,36 @@ export default defineComponent({
 				<form @submit.prevent="submitForm" class="form-grid" v-if="!isLoading">
 					<!-- left column -->
 					<div class="photo-pane">
-						<div class="photo-frame" :class="{'photo-frame--empty': !imagePreviewUrl}">
-							<img v-if="imagePreviewUrl" :src="imagePreviewUrl" alt="Cat preview"/>
-							<div v-else class="photo-placeholder">No photo</div>
+						<!-- note:simple, convenient: drag to pan, wheel to zoom, double-click to center -->
+						<div
+							class="photo-frame"
+							ref="photoFrame"
+							:class="{'photo-frame--empty': !imagePreviewUrl}"
+							:style="previewStyle"
+							@mousedown.prevent="startDrag"
+							@mousemove.prevent="onDrag"
+							@mouseup.prevent="endDrag"
+							@mouseleave.prevent="endDrag"
+							@wheel.prevent="onWheel"
+							@dblclick.prevent="recenterAtClick"
+							@touchstart.passive="startDrag"
+							@touchmove.prevent.stop="onDrag"
+							@touchend="endDrag"
+						>
+							<div v-if="!imagePreviewUrl" class="photo-placeholder">No photo</div>
+						</div>
+
+						<div class="zoom-controls" v-if="imagePreviewUrl">
+							<button type="button" class="zoom-btn" @click="zoomOut" aria-label="Zoom out">−</button>
+							<div class="zoom-readout">{{ formData.imageScale.toFixed(2) }}×</div>
+							<button type="button" class="zoom-btn" @click="zoomIn" aria-label="Zoom in">+</button>
+							<button type="button" class="zoom-btn reset" @click="resetView" aria-label="Reset">reset</button>
 						</div>
 
 						<!-- hide native input and use ImageInput bound to same model -->
 						<ImageInput v-model="imageFile" class="hidden-input"/>
 						<FancyButton class="upload-btn" text="Upload photo" type="button" @click="$el.querySelector('.hidden-input input')?.click()"/>
+						<div v-if="imagePreviewUrl" class="hint">drag to pan • wheel to zoom • double-click to center</div>
 					</div>
 
 					<!-- right column -->
@@ -345,29 +456,69 @@ $accent-dark: #a172cc;
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
+	width: 360px; /* note:hard cap to avoid overflow into right column */
 }
 
 .photo-frame {
+	position: relative;
 	width: 360px;
 	height: 270px;
 	border-radius: 4px;
 	overflow: hidden;
 	background: #c0b6c7;
 	box-shadow: inset 0 0 0 4px rgba(0,0,0,.06);
+	cursor: grab;
 
-	img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
+	&:active { cursor: grabbing; }
 }
 
 .photo-frame--empty {
+	background-image: none !important;
+}
+
+.photo-placeholder {
 	display: grid;
 	place-items: center;
+	width: 100%;
+	height: 100%;
 	color: rgba(0,0,0,.45);
 	font-weight: 600;
+}
+
+/* fixed controls that don't bleed into right column */
+.zoom-controls {
+	width: 360px; /* note:match frame width */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: .5rem;
+	margin-top: .5rem;
+}
+
+/* wipe global button styles and restyle compactly */
+.zoom-btn {
+	all: unset; /* note:neutralize inherited .btn rules */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: .45rem .7rem;
+	border-radius: 6px;
+	background: $accent;
+	color: #fff;
+	cursor: pointer;
+	white-space: nowrap;
+
+	&:hover { background: $accent-dark; }
+}
+.zoom-btn.reset {
+	background: #666;
+	&:hover { background: #444; }
+}
+
+.zoom-readout {
+	min-width: 3.5ch;
+	text-align: center;
+	opacity: .9;
 }
 
 .hidden-input {
@@ -383,6 +534,12 @@ $accent-dark: #a172cc;
 	border-radius: 6px !important;
 
 	&:hover { background: $accent-dark !important; }
+}
+
+.hint {
+	margin-top: .5rem;
+	font-size: .85rem;
+	opacity: .8;
 }
 
 /* right column */
@@ -418,7 +575,6 @@ $accent-dark: #a172cc;
 			box-shadow: 0 2px 0 0 $accent;
 		}
 	}
-	/* small “Select” look if your components show placeholders inside the control */
 	:deep(.placeholder) {
 		opacity: .85;
 	}
@@ -440,5 +596,10 @@ $accent-dark: #a172cc;
 	display: flex;
 	align-items: stretch;
 	width: 100%;
+}
+
+/* responsive guard to keep left column tidy on small screens */
+@media (max-width: 860px) {
+	.photo-pane, .zoom-controls, .photo-frame { width: 100%; max-width: 360px; }
 }
 </style>
