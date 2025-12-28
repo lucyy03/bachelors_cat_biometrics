@@ -88,35 +88,89 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth, db } from '../utils/firebaseInit';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+
+const router = useRouter();
 
 const form = reactive({
-  firstName: '',
-  lastName: '',
-  username: '',
-  email: '',
-  password: '',
-  nationality: '',
-  role: 'breeder'
-})
+	firstName: '',
+	lastName: '',
+	username: '',
+	email: '',
+	password: '',
+	nationality: '',
+	role: 'breeder'
+});
 
-const fileName = ref('')
-const signupForm = ref(null)
+const fileName = ref('');
+const signupForm = ref(null);
+const isSubmitting = ref(false);
 
-function onFile(e){
-  const f = e.target.files?.[0]
-  fileName.value = f ? f.name : ''
+function onFile(e) {
+	const f = e.target.files?.[0];
+	fileName.value = f ? f.name : '';
 }
 
-function onSubmit(){
-  // Let the browser run native validation and show tooltips
-  if (!signupForm.value.checkValidity()) {
-    signupForm.value.reportValidity()
-    return
-  }
-  console.log('SignUp form:', { ...form, fileName: fileName.value })
-  alert('Frontend complete 👍 (no backend yet).')
+async function onSubmit() {
+	if (!signupForm.value?.checkValidity()) {
+		signupForm.value?.reportValidity();
+		return;
+	}
+
+	if (isSubmitting.value) return;
+	isSubmitting.value = true;
+
+	try {
+		console.log('[signup] start submit', { ...form });
+
+		const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
+		const user = cred.user;
+		console.log('[signup] user created', user.uid);
+
+		const displayName = form.username || `${form.firstName} ${form.lastName}`.trim();
+		if (displayName) {
+			await updateProfile(user, { displayName });
+			console.log('[signup] profile updated', displayName);
+		}
+
+		const roleValue = form.role === 'breeder' ? 'BREEDER' : 'USER';
+
+		console.log('[signup] writing firestore doc…');
+		await setDoc(doc(db, 'users', user.uid), {
+			firstName: form.firstName,
+			lastName: form.lastName,
+			username: form.username,
+			email: form.email,
+			nationality: form.nationality,
+			role: roleValue,
+			certificateFileName: fileName.value || null,
+			createdAt: serverTimestamp()
+		});
+		console.log('[signup] firestore user doc saved');
+
+		alert('Account created successfully!');
+		console.log('[signup] navigating to /');
+		await router.push('/');
+	} catch (err) {
+		console.error('[signup] error during signup:', err);
+
+		let msg = 'Sign up failed';
+		if (err?.code === 'auth/email-already-in-use') msg = 'Email already in use';
+		if (err?.code === 'auth/invalid-email') msg = 'Invalid email';
+		if (err?.code === 'auth/weak-password') msg = 'Password too weak (min 6 chars)';
+		if (err?.code === 'permission-denied') msg = 'You do not have permission to create this user document';
+
+		alert(msg);
+	} finally {
+		isSubmitting.value = false;
+	}
 }
+
+
 </script>
 
 <style scoped>

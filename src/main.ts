@@ -22,7 +22,7 @@ import {
     faRefresh
 } from "@fortawesome/free-solid-svg-icons";
 import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome'
-import {analytics} from './utils/firebaseInit';
+//import {analytics} from './utils/firebaseInit';
 
 library.add(faArrowDown, faRefresh, faPencil, faChevronDown, faArrowRight, faCloudArrowUp, faXmark, faTrash, faImage, faWarning, faDownload, faCode, faAlignLeft, faImage, faRotate);
 
@@ -40,4 +40,4 @@ app.use(VueTippy, {
 });
 app.mount('#app');
 
-console.log('Firebase Analytics Initialized:', analytics);
+//console.log('Firebase Analytics Initialized:', analytics);

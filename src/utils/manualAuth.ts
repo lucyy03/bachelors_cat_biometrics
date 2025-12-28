@@ -1,43 +1,29 @@
-import {ref, onMounted, onBeforeUnmount} from 'vue';
+// src/utils/manualAuth.ts
+//assumptions: manual login does not actually verify email/password, just sets a local flag
 
-const KEY = 'manualAuth.isLoggedIn';
-const isLoggedIn = ref<boolean>(false);
+import { ref } from 'vue';
 
-function read() {
-	// no leading slash in localStorage key by design
-	try {
-		const raw = localStorage.getItem(KEY);
-		isLoggedIn.value = raw === 'true';
-	} catch (_e) {
-		// swallow
-	}
+const MANUAL_AUTH_KEY = 'manualLoggedIn';
+
+//global ref shared across components
+const isLoggedIn = ref(localStorage.getItem(MANUAL_AUTH_KEY) === 'true');
+
+//accept optional email/password so Login.vue can pass them
+function login(email?: string, password?: string) {
+	//note:we ignore email/password here; this is just a local "logged in" flag
+	isLoggedIn.value = true;
+	localStorage.setItem(MANUAL_AUTH_KEY, 'true');
 }
 
-// react to other tabs changing the flag
-function handleStorage(ev: StorageEvent) {
-	if (ev.key === KEY) read();
+function logout() {
+	isLoggedIn.value = false;
+	localStorage.removeItem(MANUAL_AUTH_KEY);
 }
 
 export function useManualAuth() {
-	onMounted(() => {
-		read();
-		window.addEventListener('storage', handleStorage);
-	});
-	onBeforeUnmount(() => {
-		window.removeEventListener('storage', handleStorage);
-	});
-
-	function login() {
-		// set and persist true
-		isLoggedIn.value = true;
-		try { localStorage.setItem(KEY, 'true'); } catch (_e) {}
-	}
-
-	function logout() {
-		// set and persist false
-		isLoggedIn.value = false;
-		try { localStorage.setItem(KEY, 'false'); } catch (_e) {}
-	}
-
-	return { isLoggedIn, login, logout };
+	return {
+		isLoggedIn,
+		login,
+		logout
+	};
 }

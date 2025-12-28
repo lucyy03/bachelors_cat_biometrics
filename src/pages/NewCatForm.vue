@@ -1,9 +1,9 @@
 <script>
-import {addDoc, collection, serverTimestamp} from "firebase/firestore";
-import {db} from '../utils/firebaseInit';
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from '../utils/firebaseInit';
 import { useAuth } from '../utils/useAuth';
-import {getDownloadURL, getStorage, ref as firebaseStorageRef, uploadBytes} from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
+import { uploadImageToCloudinary } from '../utils/cloudinary';
 
 import TextInput from "../components/inputs/TextInput.vue";
 import SelectInput from "../components/inputs/SelectInput.vue";
@@ -19,7 +19,7 @@ const { isUserPermitted, user, signInWithGoogle } = useAuth();
 
 export default defineComponent({
 	name: "NewCatForm",
-	components: {LoadingSpinner, TextInput, FancyButton, SelectInput, ImageInput, MessageBanner},
+	components: { LoadingSpinner, TextInput, FancyButton, SelectInput, ImageInput, MessageBanner },
 
 	// expose manual flag + combined access to the template & methods
 	setup() {
@@ -49,34 +49,34 @@ export default defineComponent({
 		return {
 			formData: { ...initFormData },
 			breedOptions: [
-				{value: 'ragdoll', text: 'Ragdoll'},
+				{ value: 'ragdoll', text: 'Ragdoll' },
 			],
 			genderOptions: [
-				{value: 'male', text: 'Male'},
-				{value: 'female', text: 'Female'},
-				{value: 'unknown', text: 'Unknown'},
+				{ value: 'male', text: 'Male' },
+				{ value: 'female', text: 'Female' },
+				{ value: 'unknown', text: 'Unknown' },
 			],
 			colorOptions: [
-				{value: 'seal', text: 'Seal'},
-				{value: 'blue', text: 'Blue'},
-				{value: 'chocolate', text: 'Chocolate'},
-				{value: 'lilac', text: 'Lilac'},
-				{value: 'red', text: 'Red'},
-				{value: 'cream', text: 'Cream'},
+				{ value: 'seal', text: 'Seal' },
+				{ value: 'blue', text: 'Blue' },
+				{ value: 'chocolate', text: 'Chocolate' },
+				{ value: 'lilac', text: 'Lilac' },
+				{ value: 'red', text: 'Red' },
+				{ value: 'cream', text: 'Cream' },
 			],
 			patternOptions: [
-				{value: 'none', text: 'None'},
-				{value: 'bicolor', text: 'Bicolor'},
-				{value: 'mitted', text: 'Mitted'},
-				{value: 'colorpoint', text: 'Colorpoint'},
-				{value: 'lynx', text: 'Lynx'},
+				{ value: 'none', text: 'None' },
+				{ value: 'bicolor', text: 'Bicolor' },
+				{ value: 'mitted', text: 'Mitted' },
+				{ value: 'colorpoint', text: 'Colorpoint' },
+				{ value: 'lynx', text: 'Lynx' },
 			],
 			originOptions: [
-				{value: 'us', text: 'USA'},
-				{value: 'uk', text: 'United Kingdom'},
-				{value: 'sk', text: 'Slovakia'},
-				{value: 'cz', text: 'Czech Republic'},
-				{value: 'de', text: 'Germany'},
+				{ value: 'us', text: 'USA' },
+				{ value: 'uk', text: 'United Kingdom' },
+				{ value: 'sk', text: 'Slovakia' },
+				{ value: 'cz', text: 'Czech Republic' },
+				{ value: 'de', text: 'Germany' },
 			],
 			imageFile: '',
 			imagePreviewUrl: '',
@@ -166,7 +166,7 @@ export default defineComponent({
 		onWheel(e) {
 			//note:zoom around center for simplicity
 			const dir = e.deltaY > 0 ? -1 : 1;
-			const factor = dir > 0 ? 1.1 : 1/1.1;
+			const factor = dir > 0 ? 1.1 : 1 / 1.1;
 			this.setScale(this.formData.imageScale * factor);
 		},
 
@@ -206,28 +206,28 @@ export default defineComponent({
 			if (!this.manualLoggedIn) {
 				const permitted = await isUserPermitted();
 				if (!permitted) {
-					this.message = {text: 'You are not permitted to do this action', color: 'red'};
+					this.message = { text: 'You are not permitted to do this action', color: 'red' };
 					return;
 				}
 			}
 
 			if (!this.imageFile) {
-				this.message = {text: 'Photo is not selected', color: 'red'};
+				this.message = { text: 'Photo is not selected', color: 'red' };
 				return;
 			}
 
 			this.isLoading = true;
 
 			try {
-				const storage = getStorage();
+				//note:compress a bit on client before upload to save bandwidth
 				const options = { maxSizeMB: 3, maxWidthOrHeight: 1920, useWebWorker: true };
 				const compressedFile = await imageCompression(this.imageFile, options);
-				const storageRef = firebaseStorageRef(storage, `cats/${compressedFile.name}`);
-				const snapshot = await uploadBytes(storageRef, compressedFile);
-				this.formData.imageUrl = await getDownloadURL(snapshot.ref);
+
+				//note:upload to cloudinary instead of firebase storage
+				this.formData.imageUrl = await uploadImageToCloudinary(compressedFile);
 			} catch (e) {
 				console.error('Failed to upload image:', e);
-				this.message = {text: 'Error while uploading a image', color: 'red'};
+				this.message = { text: 'Error while uploading an image', color: 'red' };
 				this.isLoading = false;
 				return;
 			}
@@ -238,13 +238,13 @@ export default defineComponent({
 					reviewCount: 0,
 					averageScore: 5,
 					addedBy: this.user.value?.email ?? (this.manualLoggedIn ? 'manual' : 'unknown'),
-					addedAt: serverTimestamp(),
+					addedAt: serverTimestamp()
 				});
-				this.message = {text: `Cat was successfuly added. <a href="/cat/${docRef.id}" class="underline">Display this cat</a>.`, color: 'green'};
+				this.message = { text: `Cat was successfuly added. <a href="/cat/${docRef.id}" class="underline">Display this cat</a>.`, color: 'green' };
 				this.resetForm();
 			} catch (e) {
 				console.error("Error adding document: ", e);
-				this.message = {text: 'Error while adding a image', color: 'red'};
+				this.message = { text: 'Error while adding a image', color: 'red' };
 			} finally {
 				this.isLoading = false;
 			}

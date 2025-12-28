@@ -4,18 +4,23 @@ import {getAuth} from "firebase/auth";
 import {getFirestore} from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBszElq8N5yguSdq5eWBNh1b0grtbl09_w",
-    authDomain: "catbiometric-3116f.firebaseapp.com",
-    projectId: "catbiometric-3116f",
-    storageBucket: "catbiometric-3116f.appspot.com",
-    messagingSenderId: "1055398534798",
-    appId: "1:1055398534798:web:10a108a85f0895a847b3df",
-    measurementId: "G-2D1ZJ0G2QC"
+  apiKey: "AIzaSyBb6MLKe6b06SJZX_sFX1EkB8JDLiY7j84",
+  authDomain: "bp-cat-biometrics.firebaseapp.com",
+  projectId: "bp-cat-biometrics",
+  storageBucket: "bp-cat-biometrics.firebasestorage.app",
+  messagingSenderId: "520580556672",
+  appId: "1:520580556672:web:879a559384a512872c4365"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+let analytics: ReturnType<typeof getAnalytics> | null = null;
+try {
+	analytics = getAnalytics(app);
+} catch (e) {
+	//note:ignore analytics errors in dev/local env
+	analytics = null;
+}
 const db = getFirestore(app);
 const auth = getAuth(app);
 

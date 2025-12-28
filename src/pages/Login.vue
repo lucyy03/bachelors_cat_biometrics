@@ -28,30 +28,45 @@
 </template>
 
 <script lang="ts">
-import { reactive, computed, defineComponent } from 'vue'
+import { reactive, computed, defineComponent } from 'vue';
 import { useRouter } from 'vue-router';
-import { useManualAuth } from '../utils/manualAuth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../utils/firebaseInit';
 
 export default defineComponent({
 	name: 'LoginPage',
 	setup() {
 		const router = useRouter();
-		const { login: manualLogin } = useManualAuth();
 
-		// holds form state for simple manual login
 		const form = reactive({
 			email: '',
 			password: ''
 		});
 
-		// computed validation for enabling the submit button
 		const isFormValid = computed(() => !!form.email && !!form.password);
 
 		async function onLogin() {
-			// manual auth: set the localStorage flag and proceed
-			manualLogin();
-      alert('Successfully logged in');
-			router.push({ name: 'NewCatForm' });
+			try {
+				//firebase email/password login
+				await signInWithEmailAndPassword(auth, form.email, form.password);
+
+				alert('Successfully logged in');
+				//after login, user.value in useAuth() should become non-null
+				router.push({ name: 'NewCatForm' });
+			} catch (err: any) {
+				console.error(err);
+
+				let message = 'Login failed';
+				if (err?.code === 'auth/user-not-found') {
+					message = 'No user found with this email';
+				} else if (err?.code === 'auth/wrong-password') {
+					message = 'Wrong password';
+				} else if (err?.code === 'auth/invalid-email') {
+					message = 'Invalid email address';
+				}
+
+				alert(message);
+			}
 		}
 
 		return { form, isFormValid, onLogin };
