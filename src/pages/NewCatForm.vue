@@ -43,7 +43,8 @@ export default defineComponent({
 			//note:framing values persisted with the cat
 			imagePosX: 50, //note:0..100 background-position x
 			imagePosY: 50, //note:0..100 background-position y
-			imageScale: 1   //note:1..3 background-size multiplier
+			imageScale: 1,   //note:1..3 background-size multiplier
+			imageUrl: ''   // note:cloudinary url will be stored here
 		};
 
 		return {
@@ -202,7 +203,7 @@ export default defineComponent({
 		},
 
 		async submitForm() {
-			//note:allow either manual or firebase-permitted users
+			// note:allow either manual or firebase-permitted users
 			if (!this.manualLoggedIn) {
 				const permitted = await isUserPermitted();
 				if (!permitted) {
@@ -219,36 +220,42 @@ export default defineComponent({
 			this.isLoading = true;
 
 			try {
-				//note:compress a bit on client before upload to save bandwidth
+				// note:compress a bit on client before upload to save bandwidth
 				const options = { maxSizeMB: 3, maxWidthOrHeight: 1920, useWebWorker: true };
 				const compressedFile = await imageCompression(this.imageFile, options);
 
-				//note:upload to cloudinary instead of firebase storage
-				this.formData.imageUrl = await uploadImageToCloudinary(compressedFile);
+				// note:upload to cloudinary instead of firebase storage
+				const imageUrl = await uploadImageToCloudinary(compressedFile);
+				this.formData.imageUrl = imageUrl;
 			} catch (e) {
-				console.error('Failed to upload image:', e);
+				console.error('failed to upload image:', e);
 				this.message = { text: 'Error while uploading an image', color: 'red' };
 				this.isLoading = false;
 				return;
 			}
 
 			try {
-				const docRef = await addDoc(collection(db, "cats"), {
+				const docRef = await addDoc(collection(db, 'cats'), {
 					...this.formData,
 					reviewCount: 0,
 					averageScore: 5,
 					addedBy: this.user.value?.email ?? (this.manualLoggedIn ? 'manual' : 'unknown'),
 					addedAt: serverTimestamp()
 				});
-				this.message = { text: `Cat was successfuly added. <a href="/cat/${docRef.id}" class="underline">Display this cat</a>.`, color: 'green' };
+
+				this.message = {
+					text: `Cat was successfuly added. <a href="/cat/${docRef.id}" class="underline">Display this cat</a>.`,
+					color: 'green'
+				};
 				this.resetForm();
 			} catch (e) {
-				console.error("Error adding document: ", e);
+				console.error('error adding document: ', e);
 				this.message = { text: 'Error while adding a image', color: 'red' };
 			} finally {
 				this.isLoading = false;
 			}
 		}
+
 	}
 });
 </script>
