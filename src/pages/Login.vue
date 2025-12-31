@@ -45,29 +45,30 @@ export default defineComponent({
 
 		const isFormValid = computed(() => !!form.email && !!form.password);
 
-		async function onLogin() {
-			try {
-				//firebase email/password login
-				await signInWithEmailAndPassword(auth, form.email, form.password);
+    async function onLogin() {
+      try {
+        //firebase email/password login
+        await signInWithEmailAndPassword(auth, form.email, form.password);
 
-				alert('Successfully logged in');
-				//after login, user.value in useAuth() should become non-null
-				router.push({ name: 'NewCatForm' });
-			} catch (err: any) {
-				console.error(err);
+        alert('Successfully logged in');
 
-				let message = 'Login failed';
-				if (err?.code === 'auth/user-not-found') {
-					message = 'No user found with this email';
-				} else if (err?.code === 'auth/wrong-password') {
-					message = 'Wrong password';
-				} else if (err?.code === 'auth/invalid-email') {
-					message = 'Invalid email address';
-				}
+        //redirect to landing page
+        await router.push('/'); // 👈 go to LandingPage
+      } catch (err: any) {
+        console.error(err);
 
-				alert(message);
-			}
-		}
+        let message = 'Login failed';
+        if (err?.code === 'auth/user-not-found') {
+          message = 'No user found with this email';
+        } else if (err?.code === 'auth/wrong-password') {
+          message = 'Wrong password';
+        } else if (err?.code === 'auth/invalid-email') {
+          message = 'Invalid email address';
+        }
+
+        alert(message);
+      }
+    }
 
 		return { form, isFormValid, onLogin };
 	}

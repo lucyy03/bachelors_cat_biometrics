@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import {ref, watch} from 'vue';
+import {ref, watch, computed} from 'vue';
 import {db} from '../utils/firebaseInit';
 import {doc, getDoc} from 'firebase/firestore';
+import {useAuth} from '../utils/useAuth';
+import {useRouter} from 'vue-router';
 
 const props = defineProps<{
 	id: string;
@@ -10,6 +12,17 @@ const props = defineProps<{
 const cat = ref<any | null>(null);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+
+// user role handling
+type UserRole = 'BREEDER' | 'USER' | null | string;
+const currentUserRole = ref<UserRole>(null);
+const isBreeder = computed(() => currentUserRole.value === 'BREEDER');
+
+const { user } = useAuth();
+const router = useRouter();
+const currentUserId = computed(() => user.value?.uid || null);
+
+const hasExistingRating = ref(false);
 
 async function fetchCat(id: string) {
 	isLoading.value = true;
@@ -37,7 +50,48 @@ async function fetchCat(id: string) {
 	}
 }
 
-//note:refetch whenever the id prop changes (and also on first render)
+async function fetchCurrentUserRole() {
+	const firebaseUser = user.value;
+	if (!firebaseUser) {
+		currentUserRole.value = null;
+		return;
+	}
+
+	try {
+		//note:load the role from users/{uid} doc
+		const userDocRef = doc(db, 'users', firebaseUser.uid);
+		const snap = await getDoc(userDocRef);
+		if (snap.exists()) {
+			const data = snap.data() as any;
+			currentUserRole.value = data.role ?? null;
+			console.log('[cat-info] loaded user role:', currentUserRole.value);
+		} else {
+			currentUserRole.value = null;
+		}
+	} catch (e) {
+		console.error('failed to load user role', e);
+		currentUserRole.value = null;
+	}
+}
+
+async function fetchExistingRatingForCat() {
+	const uid = currentUserId.value;
+	if (!uid || !cat.value) {
+		hasExistingRating.value = false;
+		return;
+	}
+	const ratingId = `${cat.value.id}_${uid}`;
+	const ratingRef = doc(db, 'ratings', ratingId);
+	const snap = await getDoc(ratingRef);
+	hasExistingRating.value = snap.exists();
+}
+
+function onRateClick() {
+	if (!cat.value) return;
+	router.push(`/cat/${cat.value.id}/rate`);
+}
+
+//note:refetch cat whenever the id prop changes (and also on first render)
 watch(
 	() => props.id,
 	(newId) => {
@@ -46,6 +100,25 @@ watch(
 		}
 	},
 	{ immediate: true }
+);
+
+//note:load user role whenever auth user changes
+watch(
+	user,
+	() => {
+		fetchCurrentUserRole();
+	},
+	{ immediate: true }
+);
+
+//note:check for existing rating when cat or user changes
+watch(
+	[() => cat.value, currentUserId],
+	() => {
+		if (cat.value && currentUserId.value) {
+			fetchExistingRatingForCat();
+		}
+	}
 );
 </script>
 
@@ -94,6 +167,17 @@ watch(
 				</p>
 
 				<p v-if="cat.comment"><strong>Comment:</strong> {{ cat.comment }}</p>
+
+				<!-- breeder-only action -->
+				<button
+					v-if="isBreeder"
+					type="button"
+					class="rate-btn"
+					@click="onRateClick"
+				>
+					{{ hasExistingRating ? 'Update cat rating' : 'Rate' }}
+				</button>
+
 			</div>
 		</div>
 	</div>
@@ -107,5 +191,22 @@ watch(
 .cat-detail {
 	max-width: 900px;
 	margin: 0 auto;
+}
+
+.rate-btn {
+	margin-top: 1.5rem;
+	padding: 0.6rem 1.4rem;
+	border-radius: 9999px;
+	border: none;
+	background: #b58ad7;
+	color: #fff;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.rate-btn:hover {
+	background: #a172cc;
+	transform: translateY(-1px);
 }
 </style>

@@ -26,6 +26,9 @@ const routes = [
 	{ path: '/profile', component: Profile },
 	{ path: '/users-list', component: UsersList },
 	{ path: '/cat/:id', component: CatDetail },
+	{ path: '/cat/:id/rate', name: 'RateCat', component: () => import('./pages/RateCat.vue') },
+
+
 	{ path: '/analyzer', component: Analyzator },
 	{ path: '/analyses', component: Analyses },
 	{ path: '/analyse/:id', component: AnalyseDetail },
