@@ -173,7 +173,7 @@ watchEffect(async () => {
 								:imageSrc="cat.imageUrl"
 							/>
 							<p class="uploader">
-                Uploaded by: {{ cat.addedByName || cat.addedBy || 'Unknown' }}
+                Uploaded by: {{ cat.addedBy || 'Unknown' }}
               </p>
 						</div>
 					</template>
