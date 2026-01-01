@@ -1,88 +1,102 @@
 <script setup lang="ts">
-import { ref, computed, watchEffect } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuth } from '../utils/useAuth'
-import { useManualAuth } from '../utils/manualAuth'
+import {ref, computed, watchEffect} from 'vue';
+import {useRoute} from 'vue-router';
+import {useAuth} from '../utils/useAuth';
+import {useManualAuth} from '../utils/manualAuth';
 
 // firebase auth
-const { user, signOutUser, getUserData, isUserPermitted } = useAuth()
+const {user, signOutUser, isAdmin, isUserPermitted} = useAuth();
 
 // manual auth
-const { isLoggedIn: manualLoggedIn, logout: manualLogout } = useManualAuth()
+const {isLoggedIn: manualLoggedIn, logout: manualLogout} = useManualAuth();
 
-const route = useRoute()
-const isHomePage = computed(() => route.path === '/')
+const route = useRoute();
+const isHomePage = computed(() => route.path === '/');
 
 // whether ANY login method is active
-const isLoggedIn = computed(() => !!user.value || manualLoggedIn.value)
+const isLoggedIn = computed(() => !!user.value || manualLoggedIn.value);
 
-// user role stuff (firebase only)
-const userRole = ref<string | null>(null)
-const isPermitted = ref<boolean>(false)
+// permission flag for actions like "Upload your cat"
+const isPermitted = ref<boolean>(false);
 
 watchEffect(async () => {
 	if (user.value) {
-		const userData = await getUserData(user.value.uid)
-		if (userData && userData.role) {
-			userRole.value = userData.role
-			isPermitted.value = await isUserPermitted()
-		}
+		isPermitted.value = await isUserPermitted();
 	} else {
-		userRole.value = null
-		isPermitted.value = true
+		isPermitted.value = true;
 	}
-})
-
-const isAdmin = computed(() => userRole.value === 'ADMIN')
+});
 
 // logout chooses correct method
 function logout() {
 	if (user.value) {
-		signOutUser()           // firebase logout
+		signOutUser();           // firebase logout
 	} else if (manualLoggedIn.value) {
-		manualLogout()          // manual logout
-		alert('Logged out')     // match your manual login alert style
+		manualLogout();          // manual logout
+		alert('Logged out');
 	}
 }
 </script>
 
-
 <template>
 	<nav class="container">
-		<router-link to="/upload-cat">
-			<div v-if="!isHomePage && isPermitted" class="nav-item hover-underline-animation">
-				Upload your cat
-			</div>
-		</router-link>
+		<!-- navigation for normal users (non-admins) -->
+		<template v-if="!isAdmin">
+			<router-link to="/upload-cat">
+				<div
+					v-if="!isHomePage && isPermitted"
+					class="nav-item hover-underline-animation"
+				>
+					Upload your cat
+				</div>
+			</router-link>
 
-		<router-link to="/analyzer">
-			<div class="nav-item hover-underline-animation">Analyzer</div>
-		</router-link>
+			<router-link to="/analyzer">
+				<div class="nav-item hover-underline-animation">Analyzer</div>
+			</router-link>
 
-		<router-link to="/users-list" v-if="isAdmin">
-			<div class="nav-item hover-underline-animation">Users</div>
-		</router-link>
+			<router-link to="/cats-list">
+				<div class="nav-item hover-underline-animation">All cats</div>
+			</router-link>
 
-		<router-link to="/analyses" v-if="isAdmin">
-			<div class="nav-item hover-underline-animation">Analyses</div>
-		</router-link>
+			<a href="/#content" class="nav-item hover-underline-animation">
+				About service
+			</a>
 
-		<router-link to="/cats-list">
-			<div class="nav-item hover-underline-animation">All cats</div>
-		</router-link>
+			<router-link to="/profile" v-if="user">
+				<div class="nav-item hover-underline-animation">Profile</div>
+			</router-link>
+		</template>
 
-		<a href="/#content" class="nav-item hover-underline-animation">About service</a>
+		<!-- navigation for admin -->
+		<template v-else>
+			<router-link to="/admin">
+				<div class="nav-item hover-underline-animation">
+					Admin dashboard
+				</div>
+			</router-link>
 
-		<router-link to="/profile" v-if="user">
-			<div class="nav-item hover-underline-animation">Profile</div>
-		</router-link>
+			<router-link to="/admin/breeders">
+				<div class="nav-item hover-underline-animation">
+					Breeders
+				</div>
+			</router-link>
 
-		<!-- Ak je user prihlásený, zobraz Log out -->
-		<div v-if="isLoggedIn" @click="logout" class="nav-item hover-underline-animation">
+			<!-- optional: keep analyzer visible for admin too -->
+			<router-link to="/analyzer">
+				<div class="nav-item hover-underline-animation">Analyzer</div>
+			</router-link>
+		</template>
+
+		<!-- login / logout, shown for everyone -->
+		<div
+			v-if="isLoggedIn"
+			@click="logout"
+			class="nav-item hover-underline-animation"
+		>
 			Log out
 		</div>
 
-		<!-- Ak nie je prihlásený, zobraz link na /login -->
 		<router-link v-else to="/login">
 			<div class="nav-item hover-underline-animation">Log in</div>
 		</router-link>

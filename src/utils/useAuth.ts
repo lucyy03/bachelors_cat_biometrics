@@ -1,15 +1,35 @@
-import {ref} from 'vue';
-import {User, getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged} from 'firebase/auth';
+import {ref, computed} from 'vue';
+import {
+	User,
+	getAuth,
+	signInWithPopup,
+	GoogleAuthProvider,
+	signOut,
+	onAuthStateChanged
+} from 'firebase/auth';
 import {app} from './firebaseInit';
 
 const userAuth = getAuth(app);
 const user = ref<User | null>(null);
-import {db} from '../utils/firebaseInit';
-import {setDoc, doc, getDoc, serverTimestamp} from "firebase/firestore";
+const role = ref<string | null>(null); //reactive role
 
-onAuthStateChanged(userAuth, (currentUser) => {
-    user.value = currentUser;
+import {db} from '../utils/firebaseInit';
+import {setDoc, doc, getDoc, serverTimestamp} from 'firebase/firestore';
+
+//auth state listener
+onAuthStateChanged(userAuth, async (currentUser) => {
+	user.value = currentUser;
+
+	if (currentUser) {
+		const userData = await getUserData(currentUser.uid);
+		role.value = userData?.role ?? null;
+	} else {
+		role.value = null;
+	}
 });
+
+const isAdminRef = computed(() => role.value === 'ADMIN');
+
 
 function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
@@ -59,45 +79,52 @@ export async function getUserData(uid: string) {
     }
 }
 // Function to check if the user is blocked
+// Function to check if the user is blocked
 async function isUserPermitted(): Promise<boolean> {
-    try {
-        // check if logged
-        if (!user.value) {
-            return false
-        }
-        // check if not blocked
-        const userData = await getUserData(user.value.uid);
-        const isBlocked = userData ? userData.blocked : true;
+	try {
+		//check if logged
+		if (!user.value) {
+			return false;
+		}
+		//check if not blocked
+		const userData = await getUserData(user.value.uid);
+		const isBlocked = userData ? userData.blocked : true;
 
-        return !isBlocked
-    } catch (error) {
-        return false;
-    }
+		return !isBlocked;
+	} catch (error) {
+		return false;
+	}
 }
 
-// Function to check if the user is blocked
 async function getIsAdmin(): Promise<boolean> {
-    try {
-        if (!user.value) {
-            return false
-        }
-        const userData = await getUserData(user.value.uid)
-        return userData ? userData.role === 'ADMIN' : false
-    } catch (error) {
-        return false
-    }
+	try {
+		if (!user.value) {
+			return false;
+		}
+		//use cached role if we have it
+		if (role.value !== null) {
+			return role.value === 'ADMIN';
+		}
+		const userData = await getUserData(user.value.uid);
+		return userData ? userData.role === 'ADMIN' : false;
+	} catch (error) {
+		return false;
+	}
 }
 
 async function getUserRole(): Promise<string | null> {
-    try {
-        if (!user.value) {
-            return null
-        }
-        const userData = await getUserData(user.value.uid)
-        return userData?.role ?? null
-    } catch (error) {
-        return null
-    }
+	try {
+		if (!user.value) {
+			return null;
+		}
+		if (role.value !== null) {
+			return role.value;
+		}
+		const userData = await getUserData(user.value.uid);
+		return userData?.role ?? null;
+	} catch (error) {
+		return null;
+	}
 }
 
 
@@ -113,13 +140,15 @@ function signOutUser() {
 }
 
 export function useAuth() {
-    return {
-        user,
-        getUserData,
-        getUserRole,
-        getIsAdmin,
-        signInWithGoogle,
-        isUserPermitted,
-        signOutUser
-    };
+	return {
+		user,
+		role,
+		isAdmin: isAdminRef,
+		getUserData,
+		getUserRole,
+		getIsAdmin,
+		signInWithGoogle,
+		isUserPermitted,
+		signOutUser
+	};
 }
