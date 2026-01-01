@@ -156,7 +156,8 @@ watchEffect(async () => {
 
 				<h2>Reviewed cats</h2>
 
-				<div class="flex gap-10 flex-wrap">
+				<!-- changed: use grid instead of a plain flex row -->
+				<div class="reviewed-grid">
 					<template v-if="cats.length > 0">
 						<div
 							v-for="cat in cats"
@@ -173,8 +174,8 @@ watchEffect(async () => {
 								:imageSrc="cat.imageUrl"
 							/>
 							<p class="uploader">
-                Uploaded by: {{ cat.addedBy || 'Unknown' }}
-              </p>
+								Uploaded by: {{ cat.addedBy || 'Unknown' }}
+							</p>
 						</div>
 					</template>
 
@@ -197,6 +198,14 @@ watchEffect(async () => {
 
 h2 {
 	@apply text-3xl mb-3 mt-6;
+}
+
+/* new: grid of reviewed cats */
+.reviewed-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+	gap: 2.5rem;
+	align-items: flex-start;
 }
 
 .reviewed-card {

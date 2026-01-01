@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import {ref, watch, computed} from 'vue';
-import {db} from '../utils/firebaseInit';
-import {doc, getDoc} from 'firebase/firestore';
-import {useAuth} from '../utils/useAuth';
-import {useRouter} from 'vue-router';
+import { ref, watch, computed } from 'vue';
+import { db } from '../utils/firebaseInit';
+import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '../utils/useAuth';
+import { useRouter } from 'vue-router';
 
 const props = defineProps<{
 	id: string;
@@ -133,7 +133,7 @@ watch(
 		</div>
 
 		<div v-else-if="cat" class="cat-detail flex flex-col md:flex-row gap-8">
-			<!-- left: image -->
+			<!-- left: image + author -->
 			<div class="cat-photo max-w-md">
 				<img
 					v-if="cat.imageUrl"
@@ -144,6 +144,17 @@ watch(
 				<div v-else class="w-64 h-64 flex items-center justify-center bg-gray-200 rounded">
 					No photo
 				</div>
+
+				<!-- author line goes right here -->
+				<p
+					v-if="cat.addedByName || cat.addedByEmail || cat.addedBy"
+					class="author mt-3"
+				>
+					Author:
+					<span class="author-name">
+						{{ cat.addedByName || cat.addedByEmail || cat.addedBy || 'Unknown' }}
+					</span>
+				</p>
 			</div>
 
 			<!-- right: info -->
@@ -177,7 +188,6 @@ watch(
 				>
 					{{ hasExistingRating ? 'Update cat rating' : 'Rate' }}
 				</button>
-
 			</div>
 		</div>
 	</div>
@@ -208,5 +218,15 @@ watch(
 .rate-btn:hover {
 	background: #a172cc;
 	transform: translateY(-1px);
+}
+
+.author {
+	font-size: 0.9rem;
+	color: #4b5563;
+	text-align: center;
+}
+
+.author-name {
+	font-weight: 600;
 }
 </style>

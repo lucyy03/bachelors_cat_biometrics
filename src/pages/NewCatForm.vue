@@ -1,9 +1,9 @@
 <script>
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from '../utils/firebaseInit';
-import { useAuth } from '../utils/useAuth';
-import imageCompression from 'browser-image-compression';
-import { uploadImageToCloudinary } from '../utils/cloudinary';
+import { addDoc, collection, serverTimestamp, getDoc, doc } from "firebase/firestore";
+import { db } from "../utils/firebaseInit";
+import { useAuth } from "../utils/useAuth";
+import imageCompression from "browser-image-compression";
+import { uploadImageToCloudinary } from "../utils/cloudinary";
 
 import TextInput from "../components/inputs/TextInput.vue";
 import SelectInput from "../components/inputs/SelectInput.vue";
@@ -12,82 +12,85 @@ import FancyButton from "../components/FancyButton.vue";
 import MessageBanner from "../components/MessageBanner.vue";
 import LoadingSpinner from "../components/LoadingSpinner.vue";
 
-import { computed, defineComponent } from 'vue';
-import { useManualAuth } from '../utils/manualAuth';
-
-const { isUserPermitted, user, signInWithGoogle } = useAuth();
+import { computed, defineComponent } from "vue";
+import { useManualAuth } from "../utils/manualAuth";
 
 export default defineComponent({
 	name: "NewCatForm",
-	components: { LoadingSpinner, TextInput, FancyButton, SelectInput, ImageInput, MessageBanner },
+	components: {
+		LoadingSpinner,
+		TextInput,
+		FancyButton,
+		SelectInput,
+		ImageInput,
+		MessageBanner
+	},
 
-	// expose manual flag + combined access to the template & methods
+	//note:auth composable is used here (like in Profile.vue)
 	setup() {
+		const { user, isUserPermitted } = useAuth();
 		const { isLoggedIn: manualLoggedIn } = useManualAuth();
-		const canAccess = computed(() => !!user?.value || manualLoggedIn.value);
-		return { manualLoggedIn, canAccess };
+
+		const canAccess = computed(() => !!user.value || manualLoggedIn.value);
+
+		//everything returned here is available as this.user / this.isUserPermitted etc.
+		return { user, isUserPermitted, manualLoggedIn, canAccess };
 	},
 
 	data() {
-		const defaultBreed = 'ragdoll';
+		const defaultBreed = "ragdoll";
 		const initFormData = {
 			breed: defaultBreed,
-			name: '',
+			name: "",
 			age: 0,
-			baseColor: '',
-			coatPattern: 'none',
-			coatPatternColor: '',
-			gender: '',
-			origin: '',
-			comment: '',
-			//note:framing values persisted with the cat
-			imagePosX: 50, //note:0..100 background-position x
-			imagePosY: 50, //note:0..100 background-position y
-			imageScale: 1,   //note:1..3 background-size multiplier
-			imageUrl: ''   // note:cloudinary url will be stored here
+			baseColor: "",
+			coatPattern: "none",
+			coatPatternColor: "",
+			gender: "",
+			origin: "",
+			comment: "",
+			imagePosX: 50,
+			imagePosY: 50,
+			imageScale: 1,
+			imageUrl: ""
 		};
 
 		return {
 			formData: { ...initFormData },
-			breedOptions: [
-				{ value: 'ragdoll', text: 'Ragdoll' },
-			],
+			breedOptions: [{ value: "ragdoll", text: "Ragdoll" }],
 			genderOptions: [
-				{ value: 'male', text: 'Male' },
-				{ value: 'female', text: 'Female' },
-				{ value: 'unknown', text: 'Unknown' },
+				{ value: "male", text: "Male" },
+				{ value: "female", text: "Female" },
+				{ value: "unknown", text: "Unknown" }
 			],
 			colorOptions: [
-				{ value: 'seal', text: 'Seal' },
-				{ value: 'blue', text: 'Blue' },
-				{ value: 'chocolate', text: 'Chocolate' },
-				{ value: 'lilac', text: 'Lilac' },
-				{ value: 'red', text: 'Red' },
-				{ value: 'cream', text: 'Cream' },
+				{ value: "seal", text: "Seal" },
+				{ value: "blue", text: "Blue" },
+				{ value: "chocolate", text: "Chocolate" },
+				{ value: "lilac", text: "Lilac" },
+				{ value: "red", text: "Red" },
+				{ value: "cream", text: "Cream" }
 			],
 			patternOptions: [
-				{ value: 'none', text: 'None' },
-				{ value: 'bicolor', text: 'Bicolor' },
-				{ value: 'mitted', text: 'Mitted' },
-				{ value: 'colorpoint', text: 'Colorpoint' },
-				{ value: 'lynx', text: 'Lynx' },
+				{ value: "none", text: "None" },
+				{ value: "bicolor", text: "Bicolor" },
+				{ value: "mitted", text: "Mitted" },
+				{ value: "colorpoint", text: "Colorpoint" },
+				{ value: "lynx", text: "Lynx" }
 			],
 			originOptions: [
-				{ value: 'us', text: 'USA' },
-				{ value: 'uk', text: 'United Kingdom' },
-				{ value: 'sk', text: 'Slovakia' },
-				{ value: 'cz', text: 'Czech Republic' },
-				{ value: 'de', text: 'Germany' },
+				{ value: "us", text: "USA" },
+				{ value: "uk", text: "United Kingdom" },
+				{ value: "sk", text: "Slovakia" },
+				{ value: "cz", text: "Czech Republic" },
+				{ value: "de", text: "Germany" }
 			],
-			imageFile: '',
-			imagePreviewUrl: '',
+			imageFile: "",
+			imagePreviewUrl: "",
 			message: null,
 			isLoading: false,
 			initFormData,
-			user,
-			signInWithGoogle,
 
-			//note:drag state
 			isDragging: false,
 			lastX: 0,
 			lastY: 0,
@@ -99,10 +102,9 @@ export default defineComponent({
 	computed: {
 		previewStyle() {
 			if (!this.imagePreviewUrl) return {};
-			//note:simple background-based pan+zoom
 			return {
 				backgroundImage: `url(${this.imagePreviewUrl})`,
-				backgroundRepeat: 'no-repeat',
+				backgroundRepeat: "no-repeat",
 				backgroundSize: `${this.formData.imageScale * 100}% auto`,
 				backgroundPosition: `${this.formData.imagePosX}% ${this.formData.imagePosY}%`
 			};
@@ -114,7 +116,6 @@ export default defineComponent({
 			if (newFile) {
 				this.imagePreviewUrl = URL.createObjectURL(newFile);
 				this.imageFile = newFile;
-				//note:reset framing for new image
 				this.formData.imagePosX = 50;
 				this.formData.imagePosY = 50;
 				this.formData.imageScale = 1;
@@ -129,12 +130,11 @@ export default defineComponent({
 
 		resetForm() {
 			this.formData = { ...this.initFormData };
-			this.imageFile = '';
-			this.imagePreviewUrl = '';
+			this.imageFile = "";
+			this.imagePreviewUrl = "";
 		},
 
 		startDrag(e) {
-			//note:start panning
 			this.isDragging = true;
 			const p = this._point(e);
 			this.lastX = p.x;
@@ -151,7 +151,6 @@ export default defineComponent({
 			const dx = p.x - this.lastX;
 			const dy = p.y - this.lastY;
 
-			//note:convert px to % of frame; direction matches finger
 			const nx = this.formData.imagePosX - (dx / rect.width) * 100;
 			const ny = this.formData.imagePosY - (dy / rect.height) * 100;
 
@@ -162,17 +161,17 @@ export default defineComponent({
 			this.lastY = p.y;
 		},
 
-		endDrag() { this.isDragging = false; },
+		endDrag() {
+			this.isDragging = false;
+		},
 
 		onWheel(e) {
-			//note:zoom around center for simplicity
 			const dir = e.deltaY > 0 ? -1 : 1;
 			const factor = dir > 0 ? 1.1 : 1 / 1.1;
 			this.setScale(this.formData.imageScale * factor);
 		},
 
 		recenterAtClick(e) {
-			//note:double click/tap to center under cursor
 			const frame = this.$refs.photoFrame;
 			if (!frame) return;
 			const rect = frame.getBoundingClientRect();
@@ -183,8 +182,14 @@ export default defineComponent({
 			this.formData.imagePosY = Math.max(0, Math.min(100, ry));
 		},
 
-		zoomIn() { this.setScale(this.formData.imageScale * 1.2); },
-		zoomOut() { this.setScale(this.formData.imageScale / 1.2); },
+		zoomIn() {
+			this.setScale(this.formData.imageScale * 1.2);
+		},
+
+		zoomOut() {
+			this.setScale(this.formData.imageScale / 1.2);
+		},
+
 		resetView() {
 			this.formData.imagePosX = 50;
 			this.formData.imagePosY = 50;
@@ -192,70 +197,131 @@ export default defineComponent({
 		},
 
 		setScale(v) {
-			//note:clamp and keep position within 0..100 (background won't show gaps)
 			this.formData.imageScale = Math.max(this.minScale, Math.min(this.maxScale, v));
 		},
 
 		_point(e) {
-			//note:unified pointer
-			if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+			if (e.touches && e.touches.length) {
+				return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+			}
 			return { x: e.clientX, y: e.clientY };
 		},
 
 		async submitForm() {
-			// note:allow either manual or firebase-permitted users
+			//note:permission check (BREEDER etc.)
 			if (!this.manualLoggedIn) {
-				const permitted = await isUserPermitted();
+				const permitted = await this.isUserPermitted();
 				if (!permitted) {
-					this.message = { text: 'You are not permitted to do this action', color: 'red' };
+					this.message = {
+						text: "You are not permitted to do this action",
+						color: "red"
+					};
 					return;
 				}
 			}
 
 			if (!this.imageFile) {
-				this.message = { text: 'Photo is not selected', color: 'red' };
+				this.message = { text: "Photo is not selected", color: "red" };
 				return;
 			}
 
 			this.isLoading = true;
 
 			try {
-				// note:compress a bit on client before upload to save bandwidth
-				const options = { maxSizeMB: 3, maxWidthOrHeight: 1920, useWebWorker: true };
+				const options = {
+					maxSizeMB: 3,
+					maxWidthOrHeight: 1920,
+					useWebWorker: true
+				};
 				const compressedFile = await imageCompression(this.imageFile, options);
-
-				// note:upload to cloudinary instead of firebase storage
 				const imageUrl = await uploadImageToCloudinary(compressedFile);
 				this.formData.imageUrl = imageUrl;
 			} catch (e) {
-				console.error('failed to upload image:', e);
-				this.message = { text: 'Error while uploading an image', color: 'red' };
+				console.error("failed to upload image:", e);
+				this.message = {
+					text: "Error while uploading an image",
+					color: "red"
+				};
 				this.isLoading = false;
 				return;
 			}
 
 			try {
-				const docRef = await addDoc(collection(db, 'cats'), {
+				const firebaseUser = this.user; // note: from useAuth via setup
+				console.log("[new-cat] firebase user:", firebaseUser);
+
+				let addedByName = "Unknown";
+				let addedByEmail = null;
+				let addedBy = "Unknown";
+
+				if (firebaseUser) {
+					//note:try to read extra info from users/{uid}
+					try {
+						const userDocRef = doc(db, "users", firebaseUser.uid);
+						const userSnap = await getDoc(userDocRef);
+
+						if (userSnap.exists()) {
+							const u = userSnap.data();
+							const nameFromDoc =
+								u.username ||
+								`${u.firstName || ""} ${u.lastName || ""}`.trim();
+
+							addedByName =
+								nameFromDoc ||
+								firebaseUser.displayName ||
+								firebaseUser.email ||
+								"Unknown";
+						} else {
+							addedByName =
+								firebaseUser.displayName ||
+								firebaseUser.email ||
+								"Unknown";
+						}
+					} catch (err) {
+						console.error("failed to fetch user doc for author", err);
+						addedByName =
+							firebaseUser.displayName ||
+							firebaseUser.email ||
+							"Unknown";
+					}
+
+					addedByEmail = firebaseUser.email || null;
+					addedBy = addedByName;
+				} else if (this.manualLoggedIn) {
+					addedByName = "Manual user";
+					addedByEmail = "manual";
+					addedBy = "Manual user";
+				}
+
+				const payload = {
 					...this.formData,
 					reviewCount: 0,
 					averageScore: 5,
-					addedBy: this.user.value?.email ?? (this.manualLoggedIn ? 'manual' : 'unknown'),
+					addedByName,
+					addedByEmail,
+					addedBy,
 					addedAt: serverTimestamp()
-				});
+				};
+
+				console.log("[new-cat] payload:", payload);
+
+				const docRef = await addDoc(collection(db, "cats"), payload);
 
 				this.message = {
 					text: `Cat was successfuly added. <a href="/cat/${docRef.id}" class="underline">Display this cat</a>.`,
-					color: 'green'
+					color: "green"
 				};
 				this.resetForm();
 			} catch (e) {
-				console.error('error adding document: ', e);
-				this.message = { text: 'Error while adding a image', color: 'red' };
+				console.error("error adding document: ", e);
+				this.message = {
+					text: "Error while adding a image",
+					color: "red"
+				};
 			} finally {
 				this.isLoading = false;
 			}
 		}
-
 	}
 });
 </script>
