@@ -14,6 +14,8 @@ import AnalyseDetail from './pages/AnalyseDetail.vue';
 import PropertyDetail from './pages/PropertyDetail.vue';
 import AnalyzerOld from './pages/Analyzer-backup-more-in-one.vue';
 
+import AdminRatingDetail from './pages/AdminRatingDetail.vue';
+
 // auth pages
 import SignUp from './pages/SignUp.vue';
 import Login from './pages/Login.vue';
@@ -43,6 +45,12 @@ const routes = [
 	// login and signup
 	{ path: '/login', name: 'Login', component: Login },
 	{ path: '/signup', name: 'SignUp', component: SignUp },
+
+	{
+	path: '/admin/rating/:id',
+	component: AdminRatingDetail,
+	meta: { requiresAdmin: true }
+},
 
 	// admin
 	{
