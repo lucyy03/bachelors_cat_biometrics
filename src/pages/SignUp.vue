@@ -161,12 +161,14 @@ async function onSubmit() {
 
 	if (isSubmitting.value) return;
 	isSubmitting.value = true;
+	let createdUser = null;
 
 	try {
 		console.log('[signup] start submit', { ...form });
 
 		const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
 		const user = cred.user;
+		createdUser = user;
 		console.log('[signup] user created', user.uid);
 
 		const displayName = form.username || `${form.firstName} ${form.lastName}`.trim();
@@ -197,6 +199,11 @@ async function onSubmit() {
 		});
 		console.log('[signup] firestore user doc saved');
 
+		if (form.role === 'breeder') {
+			alert('Your breeder account has been created and is now pending administrator approval. You will be able to continue once your certificate has been reviewed.');
+			return;
+		}
+
 		alert('Account created successfully!');
 		console.log('[signup] navigating to /');
 		await router.push('/');
@@ -217,8 +224,8 @@ async function onSubmit() {
 		alert(msg);
 
 		try {
-			if (user) {
-				await user.delete();
+			if (createdUser) {
+				await createdUser.delete();
 			}
 		} catch (e) {
 			console.warn('[signup] failed to delete auth user after error', e);

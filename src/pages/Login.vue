@@ -30,8 +30,9 @@
 <script lang="ts">
 import { reactive, computed, defineComponent } from 'vue';
 import { useRouter } from 'vue-router';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../utils/firebaseInit';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth, db } from '../utils/firebaseInit';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default defineComponent({
 	name: 'LoginPage',
@@ -48,7 +49,32 @@ export default defineComponent({
     async function onLogin() {
       try {
         //firebase email/password login
-        await signInWithEmailAndPassword(auth, form.email, form.password);
+        const cred = await signInWithEmailAndPassword(auth, form.email, form.password);
+
+        const userDocSnap = await getDoc(doc(db, 'users', cred.user.uid));
+        const userData = userDocSnap.exists() ? userDocSnap.data() : null;
+
+        if (userData?.role === 'BREEDER') {
+          const certStatus = userData?.certificateStatus;
+
+          if (certStatus !== 'ACCEPTED') {
+            await signOut(auth);
+
+            let breederMessage =
+              'Your breeder account cannot be accessed yet because no certificate approval status is available. Please contact an administrator.';
+
+            if (certStatus === 'PENDING') {
+              breederMessage =
+                'Your breeder account is pending administrator approval. You will be able to sign in once your certificate has been reviewed.';
+            } else if (certStatus === 'DENIED') {
+              breederMessage =
+                'Your breeder certificate submission was not approved. Please contact an administrator or submit an updated certificate.';
+            }
+
+            alert(breederMessage);
+            return;
+          }
+        }
 
         alert('Successfully logged in');
 
