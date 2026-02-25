@@ -82,6 +82,12 @@ function logout() {
 				</div>
 			</router-link>
 
+			<router-link to="/admin/certificates">
+				<div class="nav-item hover-underline-animation">
+					Certificates
+				</div>
+			</router-link>
+
 			<!-- optional: keep analyzer visible for admin too -->
 			<router-link to="/analyzer">
 				<div class="nav-item hover-underline-animation">Analyzer</div>

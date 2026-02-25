@@ -23,6 +23,7 @@ import Login from './pages/Login.vue';
 // admin pages
 import AdminDashboard from './pages/AdminDashboard.vue';
 import AdminBreeders from './pages/AdminBreeders.vue';
+import AdminCertificate from './pages/AdminCertificate.vue';
 
 import {useAuth} from './utils/useAuth';
 
@@ -61,6 +62,11 @@ const routes = [
 	{
 		path: '/admin/breeders',
 		component: AdminBreeders,
+		meta: { requiresAdmin: true }
+	},
+	{
+		path: '/admin/certificates',
+		component: AdminCertificate,
 		meta: { requiresAdmin: true }
 	},
 

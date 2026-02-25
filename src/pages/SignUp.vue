@@ -93,6 +93,8 @@ import { useRouter } from 'vue-router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../utils/firebaseInit';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import imageCompression from 'browser-image-compression';
+import { uploadImageToCloudinary } from "../utils/cloudinary";
 
 const router = useRouter();
 
@@ -107,12 +109,48 @@ const form = reactive({
 });
 
 const fileName = ref('');
+const certFile = ref(null);
 const signupForm = ref(null);
 const isSubmitting = ref(false);
 
 function onFile(e) {
-	const f = e.target.files?.[0];
+	const f = e.target.files?.[0] || null;
+	certFile.value = f;
 	fileName.value = f ? f.name : '';
+}
+
+function isImageFile(file) {
+	if (!file) return false;
+	return file.type?.startsWith('image/');
+}
+
+async function uploadCertificateIfNeeded() {
+	if (form.role !== 'breeder') {
+		return { certificateUrl: null, certificateFileName: null, certificateStatus: null };
+	}
+
+	if (!certFile.value) {
+		throw new Error('certificate_missing');
+	}
+
+	let fileToUpload = certFile.value;
+
+	if (isImageFile(fileToUpload)) {
+		const options = {
+			maxSizeMB: 3,
+			maxWidthOrHeight: 1920,
+			useWebWorker: true
+		};
+		fileToUpload = await imageCompression(fileToUpload, options);
+	}
+
+	const certificateUrl = await uploadImageToCloudinary(fileToUpload);
+
+	return {
+		certificateUrl,
+		certificateFileName: certFile.value.name,
+		certificateStatus: 'PENDING'
+	};
 }
 
 async function onSubmit() {
@@ -139,6 +177,8 @@ async function onSubmit() {
 
 		const roleValue = form.role === 'breeder' ? 'BREEDER' : 'USER';
 
+		const certData = await uploadCertificateIfNeeded();
+
 		console.log('[signup] writing firestore doc…');
 		await setDoc(doc(db, 'users', user.uid), {
 			firstName: form.firstName,
@@ -147,7 +187,12 @@ async function onSubmit() {
 			email: form.email,
 			nationality: form.nationality,
 			role: roleValue,
-			certificateFileName: fileName.value || null,
+
+			certificateFileName: certData.certificateFileName,
+			certificateUrl: certData.certificateUrl,
+			certificateStatus: certData.certificateStatus,
+			certificateUploadedAt: certData.certificateStatus ? serverTimestamp() : null,
+
 			createdAt: serverTimestamp()
 		});
 		console.log('[signup] firestore user doc saved');
@@ -158,6 +203,11 @@ async function onSubmit() {
 	} catch (err) {
 		console.error('[signup] error during signup:', err);
 
+		if (err?.message === 'certificate_missing') {
+			alert('Certificate is required for breeders');
+			return;
+		}
+
 		let msg = 'Sign up failed';
 		if (err?.code === 'auth/email-already-in-use') msg = 'Email already in use';
 		if (err?.code === 'auth/invalid-email') msg = 'Invalid email';
@@ -165,12 +215,18 @@ async function onSubmit() {
 		if (err?.code === 'permission-denied') msg = 'You do not have permission to create this user document';
 
 		alert(msg);
+
+		try {
+			if (user) {
+				await user.delete();
+			}
+		} catch (e) {
+			console.warn('[signup] failed to delete auth user after error', e);
+		}
 	} finally {
 		isSubmitting.value = false;
 	}
 }
-
-
 </script>
 
 <style scoped>
