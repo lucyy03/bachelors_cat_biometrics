@@ -46,7 +46,8 @@ onMounted(async () => {
 	try {
 		const q = query(
 			collection(db, 'users'),
-			where('role', '==', 'BREEDER')
+			where('role', '==', 'BREEDER'),
+			where('certificateStatus', '==', 'ACCEPTED')
 		);
 		const snap = await getDocs(q);
 
