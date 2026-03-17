@@ -89,14 +89,14 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
 import { auth, db } from '../utils/firebaseInit';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import imageCompression from 'browser-image-compression';
 import { uploadImageToCloudinary } from "../utils/cloudinary";
 import { useAuth } from '../utils/useAuth';
 
-const { showAuthSuccess, showAuthError, showAuthInfo } = useAuth();
+const { showAuthError, showAuthInfo } = useAuth();
 
 const form = reactive({
 	firstName: '',
@@ -198,6 +198,8 @@ async function onSubmit() {
 			createdAt: serverTimestamp()
 		});
 		console.log('[signup] firestore user doc saved');
+		await signOut(auth);
+		console.log('[signup] signed out after account creation');
 
 		if (form.role === 'breeder') {
 			showAuthInfo(
@@ -207,8 +209,10 @@ async function onSubmit() {
 			return;
 		}
 
-		showAuthSuccess('/', 'Account created successfully', 'Taking you to the homepage...');
-		console.log('[signup] navigating to /');
+		showAuthInfo(
+			'Account created successfully',
+			'Your account has been created successfully. You may log in now.'
+		);
 		return;
 	} catch (err) {
 		console.error('[signup] error during signup:', err);
