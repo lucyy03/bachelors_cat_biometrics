@@ -65,6 +65,21 @@ const overall = computed(() => {
 	return v ?? null;
 });
 
+const heroImageStyle = computed(() => {
+	if (!cat.value?.imageUrl) return {};
+
+	const posX = Number(cat.value.imagePosX ?? 50);
+	const posY = Number(cat.value.imagePosY ?? 50);
+	const scale = Number(cat.value.imageScale ?? 1);
+
+	return {
+		backgroundImage: `url(${cat.value.imageUrl})`,
+		backgroundRepeat: 'no-repeat',
+		backgroundPosition: `${posX}% ${posY}%`,
+		backgroundSize: `${scale * 100}% auto`
+	};
+});
+
 onMounted(async () => {
 	try {
 		const ratingId = route.params.id as string;
@@ -118,7 +133,12 @@ function goBack() {
 				<section class="hero">
 					<div class="hero-media">
 						<div class="img-wrap" v-if="cat?.imageUrl">
-							<img :src="cat.imageUrl" :alt="cat?.name || 'cat'" />
+							<div
+								class="img-framed"
+								:style="heroImageStyle"
+								:aria-label="cat?.name || 'cat'"
+								role="img"
+							></div>
 						</div>
 						<div class="img-fallback" v-else>
 							<div class="fallback-icon">🐾</div>
@@ -309,11 +329,11 @@ function goBack() {
 	background: rgba(255, 255, 255, 0.06);
 }
 
-.img-wrap img {
+.img-framed {
 	width: 100%;
 	height: 100%;
-	object-fit: cover;
 	display: block;
+	background-color: rgba(255, 255, 255, 0.06);
 }
 
 .img-fallback {
