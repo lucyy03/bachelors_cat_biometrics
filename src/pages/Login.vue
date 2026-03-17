@@ -29,15 +29,15 @@
 
 <script lang="ts">
 import { reactive, computed, defineComponent } from 'vue';
-import { useRouter } from 'vue-router';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db } from '../utils/firebaseInit';
 import { doc, getDoc } from 'firebase/firestore';
+import { useAuth } from '../utils/useAuth';
 
 export default defineComponent({
 	name: 'LoginPage',
 	setup() {
-		const router = useRouter();
+		const { showAuthSuccess, showAuthError } = useAuth();
 
 		const form = reactive({
 			email: '',
@@ -71,15 +71,12 @@ export default defineComponent({
                 'Your breeder certificate submission was not approved. Please contact an administrator or submit an updated certificate.';
             }
 
-            alert(breederMessage);
+            showAuthError('Login unsuccessful', breederMessage);
             return;
           }
         }
 
-        alert('Successfully logged in');
-
-        //redirect to landing page
-        await router.push('/'); // 👈 go to LandingPage
+        showAuthSuccess('/', 'Login successful', 'Taking you to the homepage...');
       } catch (err: any) {
         console.error(err);
 
@@ -92,7 +89,7 @@ export default defineComponent({
           message = 'Invalid email address';
         }
 
-        alert(message);
+        showAuthError('Login unsuccessful', `${message}. Try again, check your credentials, or create an account.`);
       }
     }
 

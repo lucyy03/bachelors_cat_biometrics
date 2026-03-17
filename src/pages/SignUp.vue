@@ -89,14 +89,14 @@
 
 <script setup>
 import { reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../utils/firebaseInit';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import imageCompression from 'browser-image-compression';
 import { uploadImageToCloudinary } from "../utils/cloudinary";
+import { useAuth } from '../utils/useAuth';
 
-const router = useRouter();
+const { showAuthSuccess, showAuthError, showAuthInfo } = useAuth();
 
 const form = reactive({
 	firstName: '',
@@ -200,18 +200,21 @@ async function onSubmit() {
 		console.log('[signup] firestore user doc saved');
 
 		if (form.role === 'breeder') {
-			alert('Your breeder account has been created and is now pending administrator approval. You will be able to continue once your certificate has been reviewed.');
+			showAuthInfo(
+				'Breeder account pending approval',
+				'Your breeder account has been created and is now pending administrator approval. You will be able to continue once your certificate has been reviewed.'
+			);
 			return;
 		}
 
-		alert('Account created successfully!');
+		showAuthSuccess('/', 'Account created successfully', 'Taking you to the homepage...');
 		console.log('[signup] navigating to /');
-		await router.push('/');
+		return;
 	} catch (err) {
 		console.error('[signup] error during signup:', err);
 
 		if (err?.message === 'certificate_missing') {
-			alert('Certificate is required for breeders');
+			showAuthError('Sign up unsuccessful', 'Certificate is required for breeders.');
 			return;
 		}
 
@@ -221,7 +224,7 @@ async function onSubmit() {
 		if (err?.code === 'auth/weak-password') msg = 'Password too weak (min 6 chars)';
 		if (err?.code === 'permission-denied') msg = 'You do not have permission to create this user document';
 
-		alert(msg);
+		showAuthError('Sign up unsuccessful', `${msg}. Please try again.`);
 
 		try {
 			if (createdUser) {

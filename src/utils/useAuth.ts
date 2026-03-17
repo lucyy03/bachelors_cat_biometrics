@@ -2,7 +2,8 @@ import {ref, computed} from 'vue';
 import {
 	User,
 	getAuth,
-	signInWithPopup,
+	signInWithRedirect,
+	getRedirectResult,
 	GoogleAuthProvider,
 	signOut,
 	onAuthStateChanged
@@ -12,6 +13,14 @@ import {app} from './firebaseInit';
 const userAuth = getAuth(app);
 const user = ref<User | null>(null);
 const role = ref<string | null>(null); //reactive role
+const authFeedbackVisible = ref(false);
+const authFeedbackTarget = ref('/');
+const authFeedbackTitle = ref('Login successful');
+const authFeedbackMessage = ref('Redirecting you to the website...');
+const authFeedbackVariant = ref<'success' | 'error' | 'info'>('success');
+const authFeedbackAutoRedirect = ref(true);
+const authFeedbackRequiresAcknowledgement = ref(false);
+let googleRedirectInitPromise: Promise<void> | null = null;
 
 import {db} from '../utils/firebaseInit';
 import {setDoc, doc, getDoc, serverTimestamp} from 'firebase/firestore';
@@ -30,17 +39,94 @@ onAuthStateChanged(userAuth, async (currentUser) => {
 
 const isAdminRef = computed(() => role.value === 'ADMIN');
 
+function getStoredAuthReturnTo() {
+	const savedPath = sessionStorage.getItem('auth_redirect_return_to');
+	if (!savedPath || savedPath.startsWith('/login') || savedPath.startsWith('/signup')) {
+		return '/';
+	}
+	return savedPath;
+}
 
-function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(userAuth, provider)
-        .then(async (result) => {
-            console.log("User signed in:", result.user);
-            await setUserData(result.user)
-        })
-        .catch((error) => {
-            console.error("Authentication error:", error);
-        });
+function showAuthSuccess(target = '/', title = 'Login successful', message = 'Redirecting you to the website...') {
+	authFeedbackTarget.value = target;
+	authFeedbackTitle.value = title;
+	authFeedbackMessage.value = message;
+	authFeedbackVariant.value = 'success';
+	authFeedbackAutoRedirect.value = true;
+	authFeedbackRequiresAcknowledgement.value = false;
+	authFeedbackVisible.value = true;
+}
+
+function showAuthError(title = 'Login unsuccessful', message = 'Try again, check your credentials, or create an account.') {
+	authFeedbackTarget.value = window.location.pathname + window.location.search + window.location.hash;
+	authFeedbackTitle.value = title;
+	authFeedbackMessage.value = message;
+	authFeedbackVariant.value = 'error';
+	authFeedbackAutoRedirect.value = false;
+	authFeedbackRequiresAcknowledgement.value = false;
+	authFeedbackVisible.value = true;
+}
+
+function showAuthInfo(title = 'Please note', message = 'Please read this message carefully.') {
+	authFeedbackTarget.value = window.location.pathname + window.location.search + window.location.hash;
+	authFeedbackTitle.value = title;
+	authFeedbackMessage.value = message;
+	authFeedbackVariant.value = 'info';
+	authFeedbackAutoRedirect.value = false;
+	authFeedbackRequiresAcknowledgement.value = true;
+	authFeedbackVisible.value = true;
+}
+
+function hideAuthFeedback() {
+	authFeedbackVisible.value = false;
+}
+
+async function signInWithGoogle() {
+	const provider = new GoogleAuthProvider();
+	sessionStorage.setItem('auth_redirect_pending', '1');
+	sessionStorage.setItem(
+		'auth_redirect_return_to',
+		window.location.pathname + window.location.search + window.location.hash
+	);
+
+	try {
+		await signInWithRedirect(userAuth, provider);
+	} catch (error) {
+		console.error("Authentication error:", error);
+		sessionStorage.removeItem('auth_redirect_pending');
+		sessionStorage.removeItem('auth_redirect_return_to');
+		showAuthError('Login unsuccessful', 'Google sign-in could not be started. Try again or create an account.');
+	}
+}
+
+async function initGoogleRedirectResult() {
+	if (googleRedirectInitPromise) {
+		return googleRedirectInitPromise;
+	}
+
+	googleRedirectInitPromise = (async () => {
+		const hadPendingRedirect = sessionStorage.getItem('auth_redirect_pending') === '1';
+
+		try {
+			const result = await getRedirectResult(userAuth);
+
+			if (result?.user) {
+				console.log("User signed in:", result.user);
+				await setUserData(result.user);
+				showAuthSuccess(getStoredAuthReturnTo());
+			}
+		} catch (error) {
+			console.error("Authentication error:", error);
+			showAuthError('Login unsuccessful', 'Google sign-in did not complete. Try again or create an account.');
+		} finally {
+			if (hadPendingRedirect) {
+				sessionStorage.removeItem('auth_redirect_pending');
+				sessionStorage.removeItem('auth_redirect_return_to');
+			}
+		}
+	})();
+
+	return googleRedirectInitPromise;
 }
 
 async function setUserData(user: User) {
@@ -148,7 +234,19 @@ export function useAuth() {
 		getUserRole,
 		getIsAdmin,
 		signInWithGoogle,
+		initGoogleRedirectResult,
 		isUserPermitted,
-		signOutUser
+		signOutUser,
+		authFeedbackVisible,
+		authFeedbackTarget,
+		authFeedbackTitle,
+		authFeedbackMessage,
+		authFeedbackVariant,
+		authFeedbackAutoRedirect,
+		authFeedbackRequiresAcknowledgement,
+		showAuthSuccess,
+		showAuthError,
+		showAuthInfo,
+		hideAuthFeedback
 	};
 }
