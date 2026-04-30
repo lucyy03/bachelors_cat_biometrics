@@ -15,6 +15,44 @@ import LoadingSpinner from "../components/LoadingSpinner.vue";
 import { computed, defineComponent } from "vue";
 import { useManualAuth } from "../utils/manualAuth";
 
+const RATING_FIELD_KEYS = [
+	"headWidth",
+	"cheekFullness",
+	"whiskerPad",
+	"chinWidth",
+	"earSize",
+	"earSet",
+	"earTilt",
+	"earTipShape",
+	"eyeSize",
+	"eyeRoundness",
+	"eyeSpacing",
+	"eyeColorDepth",
+	"maskSymmetry",
+	"maskCoverage",
+	"invertedV",
+	"whiteMarking",
+	"lynxClarity",
+	"tortieBalance",
+	"colorClarity",
+	"expression",
+	"overall"
+];
+
+function randomRatingValue(key) {
+	if (key === "overall") {
+		return Math.floor(Math.random() * 10) + 1;
+	}
+	return Math.floor(Math.random() * 101);
+}
+
+function createIdealRatingValues() {
+	return RATING_FIELD_KEYS.reduce((values, key) => {
+		values[key] = randomRatingValue(key);
+		return values;
+	}, {});
+}
+
 export default defineComponent({
 	name: "NewCatForm",
 	components: {
@@ -295,6 +333,7 @@ export default defineComponent({
 
 				const payload = {
 					...this.formData,
+					idealRatingValues: createIdealRatingValues(),
 					reviewCount: 0,
 					averageScore: 5,
 					addedByName,

@@ -2,13 +2,14 @@
 import {ref, onMounted, computed} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import {db} from '../utils/firebaseInit';
-import {doc, getDoc} from 'firebase/firestore';
+import {collection, doc, getDoc, getDocs, query, where} from 'firebase/firestore';
 
 const route = useRoute();
 const router = useRouter();
 
 const rating = ref<any | null>(null);
 const cat = ref<any | null>(null);
+const catRatings = ref<any[]>([]);
 const loading = ref(true);
 const errorMsg = ref<string | null>(null);
 
@@ -25,14 +26,47 @@ function humanizeKey(key: string) {
 	return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+function normalizeRatingValue(key: string, value: unknown) {
+	const n = Number(value);
+	if (Number.isNaN(n)) return null;
+
+	if (key === 'overall') {
+		return Math.max(0, Math.min(100, n <= 10 ? n * 10 : n));
+	}
+
+	return Math.max(0, Math.min(100, n));
+}
+
+function scoreFromValues(values: Record<string, unknown> | null | undefined) {
+	if (!values) return null;
+
+	const normalized = Object.entries(values)
+		.map(([key, value]) => normalizeRatingValue(key, value))
+		.filter((value): value is number => value !== null);
+
+	if (!normalized.length) return null;
+
+	const total = normalized.reduce((sum, value) => sum + value, 0);
+	return (total / normalized.length) / 10;
+}
+
+function formatScore(value: number | null) {
+	if (value === null) return '-';
+	return `${value.toFixed(2)} / 10`;
+}
+
 const valueItems = computed(() => {
 	const v = rating.value?.values;
 	if (!v) return [];
+	const idealValues = cat.value?.idealRatingValues || {};
 	return Object.entries(v)
 		.map(([k, val]) => ({
 			key: k,
 			label: humanizeKey(k),
-			value: Number(val)
+			value: Number(val),
+			displayPercent: normalizeRatingValue(k, val) ?? 0,
+			idealValue: idealValues[k] == null ? null : Number(idealValues[k]),
+			idealPercent: normalizeRatingValue(k, idealValues[k])
 		}))
 		.sort((a, b) => a.label.localeCompare(b.label));
 });
@@ -50,19 +84,49 @@ function groupForKey(key: string) {
 }
 
 const grouped = computed(() => {
-	const groups: Record<string, {label: string; value: number; key: string}[]> = {};
+	const groups: Record<string, {label: string; value: number; displayPercent: number; idealPercent: number | null; key: string}[]> = {};
 	for (const item of valueItems.value) {
 		const g = groupForKey(item.key);
 		if (!groups[g]) groups[g] = [];
-		groups[g].push({label: item.label, value: item.value, key: item.key});
+		groups[g].push({
+			label: item.label,
+			value: item.value,
+			displayPercent: item.displayPercent,
+			idealPercent: item.idealPercent,
+			key: item.key
+		});
 	}
 	return groups;
 });
+
+function markerPosition(value: number | null) {
+	if (value == null || Number.isNaN(value)) return null;
+	return Math.max(0, Math.min(100, value));
+}
 
 const overall = computed(() => {
 	const v = rating.value?.overallScore;
 	if (v === 0) return 0;
 	return v ?? null;
+});
+
+const perfectionRating = computed(() =>
+	scoreFromValues(cat.value?.idealRatingValues)
+);
+
+const breederRating = computed(() =>
+	scoreFromValues(rating.value?.values)
+);
+
+const overallBreedersRating = computed(() => {
+	const scores = catRatings.value
+		.map((r) => scoreFromValues(r.values))
+		.filter((score): score is number => score !== null);
+
+	if (!scores.length) return null;
+
+	const total = scores.reduce((sum, score) => sum + score, 0);
+	return total / scores.length;
 });
 
 const heroImageStyle = computed(() => {
@@ -99,6 +163,13 @@ onMounted(async () => {
 			if (catSnap.exists()) {
 				cat.value = catSnap.data();
 			}
+
+			const ratingsQ = query(
+				collection(db, 'ratings'),
+				where('catId', '==', rating.value.catId)
+			);
+			const ratingsSnap = await getDocs(ratingsQ);
+			catRatings.value = ratingsSnap.docs.map((d) => d.data());
 		}
 	} catch (e) {
 		console.error(e);
@@ -185,6 +256,25 @@ function goBack() {
 					<div class="side-card">
 						<div class="side-title">Quick summary</div>
 
+						<div class="score-window">
+							<div class="score-row">
+								<div class="score-label">Perfection rating</div>
+								<div class="score-value">{{ formatScore(perfectionRating) }}</div>
+							</div>
+
+							<div class="score-row">
+								<div class="score-label">Breeder's rating</div>
+								<div class="score-value">{{ formatScore(breederRating) }}</div>
+							</div>
+
+							<div class="score-row">
+								<div class="score-label">Overall breeders' rating</div>
+								<div class="score-value">{{ formatScore(overallBreedersRating) }}</div>
+							</div>
+						</div>
+
+						<div class="divider"></div>
+
 						<div class="kv">
 							<div class="k">Overall</div>
 							<div class="v">
@@ -230,7 +320,14 @@ function goBack() {
 								</div>
 
 								<div class="bar">
-									<div class="bar-fill" :style="{ width: `${it.value}%` }"></div>
+									<div class="bar-fill" :style="{ width: `${it.displayPercent}%` }"></div>
+									<div
+										v-if="markerPosition(it.idealPercent) !== null"
+										class="bar-ideal"
+										:style="{ left: `${markerPosition(it.idealPercent)}%` }"
+										title="Ideal rating"
+										aria-label="Ideal rating"
+									></div>
 								</div>
 
 								<div class="metric-foot muted">
@@ -447,6 +544,30 @@ function goBack() {
 	margin-bottom: 1rem;
 }
 
+.score-window {
+	display: grid;
+	gap: 0.65rem;
+	padding: 0.9rem;
+	border-radius: 0.75rem;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.score-row {
+	display: grid;
+	gap: 0.15rem;
+}
+
+.score-label {
+	font-size: 0.78rem;
+	opacity: 0.85;
+}
+
+.score-value {
+	font-size: 1.08rem;
+	font-weight: 900;
+}
+
 .kv {
 	display: flex;
 	justify-content: space-between;
@@ -536,16 +657,27 @@ function goBack() {
 }
 
 .bar {
+	position: relative;
 	height: 10px;
 	border-radius: 999px;
 	background: rgba(255, 255, 255, 0.10);
-	overflow: hidden;
 }
 
 .bar-fill {
 	height: 100%;
 	border-radius: 999px;
 	background: linear-gradient(90deg, rgba(168, 85, 247, 1), rgba(236, 72, 153, 1));
+}
+
+.bar-ideal {
+	position: absolute;
+	top: -5px;
+	bottom: -5px;
+	width: 3px;
+	border-radius: 999px;
+	background: #f8fafc;
+	box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.7), 0 0 10px rgba(248, 250, 252, 0.55);
+	transform: translateX(-50%);
 }
 
 .metric-foot {
