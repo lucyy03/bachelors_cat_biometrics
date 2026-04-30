@@ -291,6 +291,7 @@ export default defineComponent({
 				let addedByName = "Unknown";
 				let addedByEmail = null;
 				let addedBy = "Unknown";
+				let addedById = null;
 
 				if (firebaseUser) {
 					//note:try to read extra info from users/{uid}
@@ -325,6 +326,7 @@ export default defineComponent({
 
 					addedByEmail = firebaseUser.email || null;
 					addedBy = addedByName;
+					addedById = firebaseUser.uid;
 				} else if (this.manualLoggedIn) {
 					addedByName = "Manual user";
 					addedByEmail = "manual";
@@ -339,6 +341,7 @@ export default defineComponent({
 					addedByName,
 					addedByEmail,
 					addedBy,
+					addedById,
 					addedAt: serverTimestamp()
 				};
 

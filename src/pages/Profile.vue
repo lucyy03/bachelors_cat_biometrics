@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watchEffect } from 'vue';
+import { computed, onMounted, ref, watchEffect } from 'vue';
 import { db } from '../utils/firebaseInit';
 import {
 	collection,
@@ -22,6 +22,19 @@ const cats = ref([]);
 const isLoading = ref(true);
 const role = ref(null);
 const specialistRequestsStatus = ref(null);
+const profileData = ref(null);
+
+const formattedRatingAccuracy = computed(() => {
+	const value = profileData.value?.ratingAccuracyOverall;
+	if (value == null) return '-';
+	return `${Number(value).toFixed(2)}%`;
+});
+
+const formattedRatingPoints = computed(() => {
+	const value = profileData.value?.ratingPoints;
+	if (value == null) return '0.00';
+	return Number(value).toFixed(2);
+});
 
 const getRequestStatusText = (status) => {
 	if (status === 'approved') {
@@ -96,6 +109,9 @@ watchEffect(async () => {
 
 		role.value = await getUserRole();
 
+		const profileSnap = await getDoc(doc(db, 'users', user.value.uid));
+		profileData.value = profileSnap.exists() ? profileSnap.data() : null;
+
 		if (role.value === 'BREEDER') {
 			const specialistRequestDoc = await getDoc(
 				doc(db, 'specialistRequests', user.value.uid)
@@ -140,6 +156,24 @@ watchEffect(async () => {
 						:text="role"
 						class="w-fit lowercase first-letter:uppercase"
 					/>
+
+					<TagText
+						v-if="profileData?.isVerifiedBreeder"
+						text="Verified breeder"
+						color="success"
+						class="w-fit"
+					/>
+
+					<div v-if="role === 'BREEDER'" class="rating-stats">
+						<div>
+							<span class="stat-label">Rating accuracy</span>
+							<strong>{{ formattedRatingAccuracy }}</strong>
+						</div>
+						<div>
+							<span class="stat-label">Rating points</span>
+							<strong>{{ formattedRatingPoints }}</strong>
+						</div>
+					</div>
 
 					<router-link
 						to="/specialist-form"
@@ -216,6 +250,26 @@ h2 {
 
 .uploader {
 	font-size: 0.85rem;
+	color: #64748b;
+}
+
+.rating-stats {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(120px, 1fr));
+	gap: 0.75rem;
+}
+
+.rating-stats > div {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	padding: 0.65rem 0.75rem;
+	border-radius: 0.75rem;
+	background: #fff;
+}
+
+.stat-label {
+	font-size: 0.78rem;
 	color: #64748b;
 }
 </style>

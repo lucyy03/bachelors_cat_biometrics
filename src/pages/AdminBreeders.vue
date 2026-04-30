@@ -16,6 +16,9 @@ interface Breeder {
 	username: string;
 	email?: string;
 	ratingCount: number;
+	ratingAccuracyOverall?: number;
+	ratingPoints?: number;
+	isVerifiedBreeder?: boolean;
 }
 
 interface RatedCat {
@@ -59,7 +62,10 @@ onMounted(async () => {
 				id: docSnap.id,
 				username: data.username || 'unknown user',
 				email: data.email,
-				ratingCount: 0
+				ratingCount: 0,
+				ratingAccuracyOverall: data.ratingAccuracyOverall,
+				ratingPoints: data.ratingPoints,
+				isVerifiedBreeder: data.isVerifiedBreeder === true
 			});
 		});
 
@@ -150,6 +156,16 @@ async function loadRatedCatsForBreeder(breeder: Breeder) {
 function handleBreederClick(breeder: Breeder) {
 	loadRatedCatsForBreeder(breeder);
 }
+
+function formatPercent(value?: number) {
+	if (value == null) return '-';
+	return `${Number(value).toFixed(2)}%`;
+}
+
+function formatPoints(value?: number) {
+	if (value == null) return '0.00';
+	return Number(value).toFixed(2);
+}
 </script>
 
 <template>
@@ -170,9 +186,13 @@ function handleBreederClick(breeder: Breeder) {
 				<div class="breeder-main">
 					<span class="breeder-name">
 						{{ b.username }}
+						<span v-if="b.isVerifiedBreeder" class="verified-badge">Verified</span>
 					</span>
 					<span class="breeder-email">
 						{{ b.email || 'no email' }}
+					</span>
+					<span class="breeder-stats">
+						Accuracy: {{ formatPercent(b.ratingAccuracyOverall) }} &middot; Points: {{ formatPoints(b.ratingPoints) }}
 					</span>
 				</div>
 				<div class="breeder-count">
@@ -198,12 +218,12 @@ function handleBreederClick(breeder: Breeder) {
 					>
 						<CatPreview
 							:id="cat.id"
-							:name="cat.name"
-							:breed="cat.breed"
-							:age="cat.age"
-							:averageScore="cat.averageScore"
-							:reviewCount="cat.reviewCount"
-							:imageSrc="cat.imageUrl"
+							:name="cat.name || 'Unnamed cat'"
+							:breed="cat.breed || 'unknown'"
+							:age="cat.age ?? 0"
+							:averageScore="cat.averageScore ?? 0"
+							:reviewCount="cat.reviewCount ?? 0"
+							:imageSrc="cat.imageUrl || ''"
 							:adminRatingDetail="true"
 							:ratingId="cat.ratingId"
 						/>
@@ -256,9 +276,24 @@ function handleBreederClick(breeder: Breeder) {
 	font-weight: 600;
 }
 
+.verified-badge {
+	margin-left: 0.35rem;
+	padding: 0.08rem 0.4rem;
+	border-radius: 9999px;
+	background: #dcfce7;
+	color: #166534;
+	font-size: 0.7rem;
+	font-weight: 800;
+}
+
 .breeder-email {
 	font-size: 0.8rem;
 	color: #cbd5f5;
+}
+
+.breeder-stats {
+	font-size: 0.75rem;
+	color: #e2e8f0;
 }
 
 .breeder-count {

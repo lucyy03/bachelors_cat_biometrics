@@ -95,6 +95,9 @@ const ratingValues = ref<Record<string, number>>({});
 
 const FULL_RATING_WEIGHT = 1;
 const SHORT_RATING_WEIGHT = 0.5;
+const FULL_RATING_POINTS = 10;
+const SHORT_RATING_POINTS = 5;
+const VERIFIED_BREEDER_ACCURACY_THRESHOLD = 80;
 
 //note:which sliders to show right now
 const currentFields = computed<SliderField[]>(() =>
@@ -115,6 +118,10 @@ function ratingWeightForVersion(version: 'full' | 'short') {
 	return version === 'full' ? FULL_RATING_WEIGHT : SHORT_RATING_WEIGHT;
 }
 
+function ratingPointsForVersion(version: 'full' | 'short') {
+	return version === 'full' ? FULL_RATING_POINTS : SHORT_RATING_POINTS;
+}
+
 function normalizedSliderValue(field: SliderField, values: Record<string, number>) {
 	const value = Number(values[field.key] ?? 0);
 	if (field.key === 'overall') {
@@ -131,6 +138,40 @@ function scoreForFields(fields: SliderField[], values: Record<string, number>) {
 	}, 0);
 
 	return (total / fields.length) / 10;
+}
+
+function normalizedIdealValue(key: string, value: unknown) {
+	const n = Number(value);
+	if (Number.isNaN(n)) return null;
+
+	if (key === 'overall') {
+		return Math.max(0, Math.min(100, n <= 10 ? n * 10 : n));
+	}
+
+	return Math.max(0, Math.min(100, n));
+}
+
+function accuracyForFields(
+	fields: SliderField[],
+	values: Record<string, number>,
+	idealValues: Record<string, unknown> | null | undefined
+) {
+	if (!idealValues) return null;
+
+	const accuracies = fields
+		.map(field => {
+			const ideal = normalizedIdealValue(field.key, idealValues[field.key]);
+			if (ideal === null) return null;
+
+			const actual = normalizedSliderValue(field, values);
+			return Math.max(0, 100 - Math.abs(actual - ideal));
+		})
+		.filter((value): value is number => value !== null);
+
+	if (!accuracies.length) return null;
+
+	const total = accuracies.reduce((sum, value) => sum + value, 0);
+	return total / accuracies.length;
 }
 
 async function fetchCat() {
@@ -222,25 +263,42 @@ async function onSubmit() {
 		await runTransaction(db, async (transaction) => {
 			const catRef = doc(db, 'cats', catId);
 			const ratingRef = doc(db, 'ratings', ratingId);
+			const userRef = doc(db, 'users', uid);
 
 			const catSnap = await transaction.get(catRef);
 			if (!catSnap.exists()) {
 				throw new Error('cat document missing');
 			}
+			const userSnap = await transaction.get(userRef);
 
 			const catData = catSnap.data() as any;
 			let avg: number = catData.averageScore ?? 0;
 			let count: number = catData.reviewCount ?? 0;
 			let totalWeight: number = catData.totalRatingWeight ?? count;
+			const accuracyPercent = accuracyForFields(
+				currentFields.value,
+				ratingValues.value,
+				catData.idealRatingValues
+			);
+			const accuracyWeight = accuracyPercent === null ? 0 : scoreWeight;
+			const ratingPoints = accuracyPercent === null
+				? 0
+				: ratingPointsForVersion(ratingVersion.value) * (accuracyPercent / 100);
 
 			const ratingSnap = await transaction.get(ratingRef);
 
 			let oldScore = 0;
 			let oldWeight = 0;
+			let oldAccuracyPercent = 0;
+			let oldAccuracyWeight = 0;
+			let oldRatingPoints = 0;
 			if (ratingSnap.exists()) {
 				const oldData = ratingSnap.data() as any;
 				oldScore = oldData.overallScore ?? overallScore;
 				oldWeight = oldData.scoreWeight ?? ratingWeightForVersion(oldData.version === 'short' ? 'short' : 'full');
+				oldAccuracyPercent = oldData.accuracyPercent ?? 0;
+				oldAccuracyWeight = oldData.accuracyWeight ?? 0;
+				oldRatingPoints = oldData.ratingPoints ?? 0;
 			}
 
 			if (!ratingSnap.exists()) {
@@ -272,6 +330,9 @@ async function onSubmit() {
 					values: ratingValues.value,
 					overallScore,
 					scoreWeight,
+					accuracyPercent,
+					accuracyWeight,
+					ratingPoints,
 					updatedAt: now,
 					createdAt: ratingSnap.exists() ? ratingSnap.data().createdAt : now
 				},
@@ -283,6 +344,35 @@ async function onSubmit() {
 				reviewCount: count,
 				totalRatingWeight: totalWeight
 			});
+
+			const userData = userSnap.exists() ? userSnap.data() as any : {};
+			const oldAccuracyTotal = userData.ratingAccuracyTotal ?? 0;
+			const oldAccuracyTotalWeight = userData.ratingAccuracyWeight ?? 0;
+			const oldPointsTotal = userData.ratingPoints ?? 0;
+			const oldRatingCount = userData.ratingCount ?? 0;
+
+			const newAccuracyTotal = oldAccuracyTotal
+				- (oldAccuracyPercent * oldAccuracyWeight)
+				+ ((accuracyPercent ?? 0) * accuracyWeight);
+			const newAccuracyTotalWeight = Math.max(0, oldAccuracyTotalWeight - oldAccuracyWeight + accuracyWeight);
+			const newAccuracyOverall = newAccuracyTotalWeight > 0
+				? newAccuracyTotal / newAccuracyTotalWeight
+				: null;
+			const newPointsTotal = Math.max(0, oldPointsTotal - oldRatingPoints + ratingPoints);
+			const newRatingCount = oldRatingCount + (ratingSnap.exists() ? 0 : 1);
+
+			transaction.set(
+				userRef,
+				{
+					ratingAccuracyTotal: newAccuracyTotal,
+					ratingAccuracyWeight: newAccuracyTotalWeight,
+					ratingAccuracyOverall: newAccuracyOverall,
+					ratingPoints: newPointsTotal,
+					ratingCount: newRatingCount,
+					isVerifiedBreeder: newAccuracyOverall !== null && newAccuracyOverall >= VERIFIED_BREEDER_ACCURACY_THRESHOLD
+				},
+				{ merge: true }
+			);
 		});
 
 		hasExistingRating.value = true;

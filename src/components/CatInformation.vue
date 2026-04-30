@@ -10,6 +10,7 @@ const props = defineProps<{
 }>();
 
 const cat = ref<any | null>(null);
+const author = ref<any | null>(null);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 
@@ -29,10 +30,13 @@ const formattedAverageScore = computed(() => {
 	return Number(cat.value.averageScore ?? 0).toFixed(2);
 });
 
+const isAuthorVerified = computed(() => author.value?.isVerifiedBreeder === true);
+
 async function fetchCat(id: string) {
 	isLoading.value = true;
 	error.value = null;
 	cat.value = null;
+	author.value = null;
 
 	try {
 		//note:load the single cat document by id
@@ -40,10 +44,18 @@ async function fetchCat(id: string) {
 		const snap = await getDoc(refDoc);
 
 		if (snap.exists()) {
-			cat.value = {
+			const catData = {
 				id: snap.id,
 				...snap.data()
-			};
+			} as any;
+			cat.value = catData;
+
+			if (catData.addedById) {
+				const authorSnap = await getDoc(doc(db, 'users', catData.addedById));
+				if (authorSnap.exists()) {
+					author.value = authorSnap.data();
+				}
+			}
 		} else {
 			error.value = 'Cat not found';
 		}
@@ -159,6 +171,7 @@ watch(
 					<span class="author-name">
 						{{ cat.addedByName || cat.addedByEmail || cat.addedBy || 'Unknown' }}
 					</span>
+					<span v-if="isAuthorVerified" class="verified-badge">Verified breeder</span>
 				</p>
 			</div>
 
@@ -233,5 +246,17 @@ watch(
 
 .author-name {
 	font-weight: 600;
+}
+
+.verified-badge {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 0.35rem;
+	padding: 0.1rem 0.45rem;
+	border-radius: 9999px;
+	background: #dcfce7;
+	color: #166534;
+	font-size: 0.72rem;
+	font-weight: 700;
 }
 </style>

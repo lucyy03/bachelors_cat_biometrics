@@ -9,6 +9,7 @@ const router = useRouter();
 
 const rating = ref<any | null>(null);
 const cat = ref<any | null>(null);
+const breeder = ref<any | null>(null);
 const catRatings = ref<any[]>([]);
 const loading = ref(true);
 const errorMsg = ref<string | null>(null);
@@ -18,6 +19,17 @@ const formattedDate = computed(() => {
 	if (!ts) return '';
 	if (ts.toDate) return ts.toDate().toLocaleString();
 	return '';
+});
+
+const breederName = computed(() => {
+	if (!rating.value) return 'Unknown breeder';
+
+	const fromDoc = breeder.value;
+	const docName = fromDoc
+		? fromDoc.username || `${fromDoc.firstName || ''} ${fromDoc.lastName || ''}`.trim()
+		: '';
+
+	return docName || fromDoc?.displayName || fromDoc?.email || rating.value.userEmail || rating.value.userId || 'Unknown breeder';
 });
 
 function humanizeKey(key: string) {
@@ -53,6 +65,16 @@ function scoreFromValues(values: Record<string, unknown> | null | undefined) {
 function formatScore(value: number | null) {
 	if (value === null) return '-';
 	return `${value.toFixed(2)} / 10`;
+}
+
+function formatPercent(value: number | null | undefined) {
+	if (value == null) return '-';
+	return `${Number(value).toFixed(2)}%`;
+}
+
+function formatPoints(value: number | null | undefined) {
+	if (value == null) return '0.00';
+	return Number(value).toFixed(2);
 }
 
 const valueItems = computed(() => {
@@ -157,6 +179,14 @@ onMounted(async () => {
 
 		rating.value = ratingSnap.data();
 
+		if (rating.value.userId) {
+			const breederRef = doc(db, 'users', rating.value.userId);
+			const breederSnap = await getDoc(breederRef);
+			if (breederSnap.exists()) {
+				breeder.value = breederSnap.data();
+			}
+		}
+
 		if (rating.value.catId) {
 			const catRef = doc(db, 'cats', rating.value.catId);
 			const catSnap = await getDoc(catRef);
@@ -240,6 +270,14 @@ function goBack() {
 							</div>
 
 							<div class="meta-card">
+								<div class="meta-label">Rated by</div>
+								<div class="meta-value">
+									{{ breederName }}
+									<span v-if="breeder?.isVerifiedBreeder" class="verified-badge">Verified breeder</span>
+								</div>
+							</div>
+
+							<div class="meta-card">
 								<div class="meta-label">Rating id</div>
 								<div class="meta-value mono">{{ route.params.id }}</div>
 							</div>
@@ -270,6 +308,16 @@ function goBack() {
 							<div class="score-row">
 								<div class="score-label">Overall breeders' rating</div>
 								<div class="score-value">{{ formatScore(overallBreedersRating) }}</div>
+							</div>
+
+							<div class="score-row">
+								<div class="score-label">Rating accuracy</div>
+								<div class="score-value">{{ formatPercent(rating?.accuracyPercent) }}</div>
+							</div>
+
+							<div class="score-row">
+								<div class="score-label">Rating points</div>
+								<div class="score-value">{{ formatPoints(rating?.ratingPoints) }}</div>
 							</div>
 						</div>
 
@@ -509,6 +557,18 @@ function goBack() {
 
 .meta-value {
 	font-weight: 700;
+}
+
+.verified-badge {
+	display: inline-flex;
+	margin-left: 0.4rem;
+	padding: 0.12rem 0.45rem;
+	border-radius: 999px;
+	background: #dcfce7;
+	color: #166534;
+	font-size: 0.72rem;
+	font-weight: 900;
+	vertical-align: middle;
 }
 
 .mono {
