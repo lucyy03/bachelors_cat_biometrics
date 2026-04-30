@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import {useRoute, useRouter} from 'vue-router';
+import {useRoute} from 'vue-router';
 import {db} from '../utils/firebaseInit';
 import {doc, getDoc, runTransaction, serverTimestamp} from 'firebase/firestore';
 import LayoutHeader from '../components/LayoutHeader.vue';
 import {useAuth} from '../utils/useAuth';
 
 const route = useRoute();
-const router = useRouter();
 const catId = route.params.id as string;
 
 const { user } = useAuth();
@@ -94,6 +93,9 @@ const shortFields: SliderField[] = [
 //note:store values for all keys 0..100
 const ratingValues = ref<Record<string, number>>({});
 
+const FULL_RATING_WEIGHT = 1;
+const SHORT_RATING_WEIGHT = 0.5;
+
 //note:which sliders to show right now
 const currentFields = computed<SliderField[]>(() =>
 	ratingVersion.value === 'full' ? fullFields : shortFields
@@ -108,6 +110,28 @@ const groupedFields = computed<Record<string, SliderField[]>>(() => {
 	});
 	return groups;
 });
+
+function ratingWeightForVersion(version: 'full' | 'short') {
+	return version === 'full' ? FULL_RATING_WEIGHT : SHORT_RATING_WEIGHT;
+}
+
+function normalizedSliderValue(field: SliderField, values: Record<string, number>) {
+	const value = Number(values[field.key] ?? 0);
+	if (field.key === 'overall') {
+		return Math.max(0, Math.min(100, value * 10));
+	}
+	return Math.max(0, Math.min(100, value));
+}
+
+function scoreForFields(fields: SliderField[], values: Record<string, number>) {
+	if (!fields.length) return 0;
+
+	const total = fields.reduce((sum, field) => {
+		return sum + normalizedSliderValue(field, values);
+	}, 0);
+
+	return (total / fields.length) / 10;
+}
 
 async function fetchCat() {
 	isLoading.value = true;
@@ -191,7 +215,8 @@ async function onSubmit() {
 	}
 
 	const ratingId = `${catId}_${uid}`;
-	const overallScore = ratingValues.value.overall ?? 5; //1..10
+	const overallScore = scoreForFields(currentFields.value, ratingValues.value);
+	const scoreWeight = ratingWeightForVersion(ratingVersion.value);
 
 	try {
 		await runTransaction(db, async (transaction) => {
@@ -206,23 +231,34 @@ async function onSubmit() {
 			const catData = catSnap.data() as any;
 			let avg: number = catData.averageScore ?? 0;
 			let count: number = catData.reviewCount ?? 0;
+			let totalWeight: number = catData.totalRatingWeight ?? count;
 
 			const ratingSnap = await transaction.get(ratingRef);
 
 			let oldScore = 0;
+			let oldWeight = 0;
 			if (ratingSnap.exists()) {
 				const oldData = ratingSnap.data() as any;
 				oldScore = oldData.overallScore ?? overallScore;
+				oldWeight = oldData.scoreWeight ?? ratingWeightForVersion(oldData.version === 'short' ? 'short' : 'full');
 			}
 
 			if (!ratingSnap.exists()) {
 				const newCount = count + 1;
-				const newAvg = ((avg * count) + overallScore) / newCount;
+				const newTotalWeight = totalWeight + scoreWeight;
+				const newAvg = newTotalWeight > 0
+					? ((avg * totalWeight) + (overallScore * scoreWeight)) / newTotalWeight
+					: overallScore;
 				count = newCount;
 				avg = newAvg;
-			} else if (count > 0) {
-				const newAvg = ((avg * count) - oldScore + overallScore) / count;
+				totalWeight = newTotalWeight;
+			} else if (totalWeight > 0) {
+				const newTotalWeight = Math.max(0, totalWeight - oldWeight + scoreWeight);
+				const newAvg = newTotalWeight > 0
+					? ((avg * totalWeight) - (oldScore * oldWeight) + (overallScore * scoreWeight)) / newTotalWeight
+					: overallScore;
 				avg = newAvg;
+				totalWeight = newTotalWeight;
 			}
 
 			const now = serverTimestamp();
@@ -235,6 +271,7 @@ async function onSubmit() {
 					version: ratingVersion.value,
 					values: ratingValues.value,
 					overallScore,
+					scoreWeight,
 					updatedAt: now,
 					createdAt: ratingSnap.exists() ? ratingSnap.data().createdAt : now
 				},
@@ -243,7 +280,8 @@ async function onSubmit() {
 
 			transaction.update(catRef, {
 				averageScore: avg,
-				reviewCount: count
+				reviewCount: count,
+				totalRatingWeight: totalWeight
 			});
 		});
 

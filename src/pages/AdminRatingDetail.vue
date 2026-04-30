@@ -217,7 +217,7 @@ function goBack() {
 						</div>
 
 						<div class="score-badge" v-if="overall !== null">
-							<div class="score-num">{{ overall }}</div>
+							<div class="score-num">{{ formatScore(overall).replace(' / 10', '') }}</div>
 							<div class="score-sub">/ 10</div>
 						</div>
 					</div>
@@ -278,7 +278,7 @@ function goBack() {
 						<div class="kv">
 							<div class="k">Overall</div>
 							<div class="v">
-								<span class="big">{{ overall ?? '-' }}</span>
+								<span class="big">{{ formatScore(overall).replace(' / 10', '') }}</span>
 								<span class="muted">/10</span>
 							</div>
 						</div>

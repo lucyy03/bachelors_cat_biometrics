@@ -24,6 +24,11 @@ const currentUserId = computed(() => user.value?.uid || null);
 
 const hasExistingRating = ref(false);
 
+const formattedAverageScore = computed(() => {
+	if (!cat.value) return '0.00';
+	return Number(cat.value.averageScore ?? 0).toFixed(2);
+});
+
 async function fetchCat(id: string) {
 	isLoading.value = true;
 	error.value = null;
@@ -174,7 +179,7 @@ watch(
 				<p v-if="cat.origin"><strong>Country of origin/registration:</strong> {{ cat.origin }}</p>
 
 				<p>
-					<strong>Average score:</strong> {{ cat.averageScore }} ({{ cat.reviewCount }} reviews)
+					<strong>Average score:</strong> {{ formattedAverageScore }} / 10 ({{ cat.reviewCount }} reviews)
 				</p>
 
 				<p v-if="cat.comment"><strong>Comment:</strong> {{ cat.comment }}</p>

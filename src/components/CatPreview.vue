@@ -29,7 +29,7 @@
 
 			<div class="score" v-if="reviewCount">
 				<span class="text-lg text-slate-700">average</span>
-				<strong>{{ Math.round(averageScore) }}</strong>
+				<strong>{{ formattedAverageScore }}</strong>
 				<span class="font-thin">/10</span>
 			</div>
 
@@ -98,6 +98,9 @@ export default {
 			const age = this.age;
 			if (age === 0) return "Kitten";
 			return `${age} ${age === 1 ? 'year' : 'years'}`;
+		},
+		formattedAverageScore() {
+			return Number(this.averageScore ?? 0).toFixed(2);
 		},
 
 		// 👇 NEW: dynamic DETAIL target
