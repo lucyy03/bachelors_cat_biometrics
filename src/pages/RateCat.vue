@@ -369,6 +369,8 @@ async function onSubmit() {
 					ratingAccuracyOverall: newAccuracyOverall,
 					ratingPoints: newPointsTotal,
 					ratingCount: newRatingCount,
+					lastRatingAt: now,
+					isInactiveBreeder: false,
 					isVerifiedBreeder: newAccuracyOverall !== null && newAccuracyOverall >= VERIFIED_BREEDER_ACCURACY_THRESHOLD
 				},
 				{ merge: true }

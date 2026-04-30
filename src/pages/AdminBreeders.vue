@@ -6,7 +6,8 @@ import {
 	query,
 	where,
 	doc,
-	getDoc
+	getDoc,
+	updateDoc
 } from 'firebase/firestore';
 import {db} from '../utils/firebaseInit';
 import CatPreview from '../components/CatPreview.vue';
@@ -19,6 +20,7 @@ interface Breeder {
 	ratingAccuracyOverall?: number;
 	ratingPoints?: number;
 	isVerifiedBreeder?: boolean;
+	isInactiveBreeder?: boolean;
 }
 
 interface RatedCat {
@@ -39,6 +41,8 @@ interface RatedCat {
 const breeders = ref<Breeder[]>([]);
 const loading = ref(true);
 const errorMsg = ref<string | null>(null);
+const INACTIVE_AFTER_DAYS = 90;
+const INACTIVE_AFTER_MS = INACTIVE_AFTER_DAYS * 24 * 60 * 60 * 1000;
 
 //selected breeder and their rated cats
 const selectedBreeder = ref<Breeder | null>(null);
@@ -65,11 +69,12 @@ onMounted(async () => {
 				ratingCount: 0,
 				ratingAccuracyOverall: data.ratingAccuracyOverall,
 				ratingPoints: data.ratingPoints,
-				isVerifiedBreeder: data.isVerifiedBreeder === true
+				isVerifiedBreeder: data.isVerifiedBreeder === true,
+				isInactiveBreeder: data.isInactiveBreeder === true
 			});
 		});
 
-		//note:for each breeder, count how many ratings they created
+		//note:for each breeder, count ratings and mark stale breeders inactive
 		await Promise.all(
 			list.map(async (b) => {
 				const ratingsQ = query(
@@ -78,6 +83,32 @@ onMounted(async () => {
 				);
 				const ratingsSnap = await getDocs(ratingsQ);
 				b.ratingCount = ratingsSnap.size;
+
+				let latestRatingAtMs = 0;
+				ratingsSnap.forEach((r) => {
+					const data = r.data() as any;
+					const ts = data.updatedAt || data.createdAt;
+					const date = ts?.toDate ? ts.toDate() : null;
+					if (date) {
+						latestRatingAtMs = Math.max(latestRatingAtMs, date.getTime());
+					}
+				});
+
+				const isInactive = !latestRatingAtMs || Date.now() - latestRatingAtMs >= INACTIVE_AFTER_MS;
+
+				if (isInactive) {
+					b.isVerifiedBreeder = false;
+					b.isInactiveBreeder = true;
+					await updateDoc(doc(db, 'users', b.id), {
+						isInactiveBreeder: true,
+						isVerifiedBreeder: false
+					});
+				} else {
+					b.isInactiveBreeder = false;
+					await updateDoc(doc(db, 'users', b.id), {
+						isInactiveBreeder: false
+					});
+				}
 			})
 		);
 
@@ -187,6 +218,7 @@ function formatPoints(value?: number) {
 					<span class="breeder-name">
 						{{ b.username }}
 						<span v-if="b.isVerifiedBreeder" class="verified-badge">Verified</span>
+						<span v-if="b.isInactiveBreeder" class="inactive-badge">Inactive</span>
 					</span>
 					<span class="breeder-email">
 						{{ b.email || 'no email' }}
@@ -282,6 +314,16 @@ function formatPoints(value?: number) {
 	border-radius: 9999px;
 	background: #dcfce7;
 	color: #166534;
+	font-size: 0.7rem;
+	font-weight: 800;
+}
+
+.inactive-badge {
+	margin-left: 0.35rem;
+	padding: 0.08rem 0.4rem;
+	border-radius: 9999px;
+	background: #fee2e2;
+	color: #991b1b;
 	font-size: 0.7rem;
 	font-weight: 800;
 }
