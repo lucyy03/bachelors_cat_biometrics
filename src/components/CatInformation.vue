@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
 import { db } from '../utils/firebaseInit';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useAuth } from '../utils/useAuth';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -18,6 +18,7 @@ const error = ref<string | null>(null);
 type UserRole = 'BREEDER' | 'USER' | null | string;
 const currentUserRole = ref<UserRole>(null);
 const isBreeder = computed(() => currentUserRole.value === 'BREEDER');
+const isAdminUser = computed(() => currentUserRole.value === 'ADMIN');
 
 const { user } = useAuth();
 const route = useRoute();
@@ -26,6 +27,19 @@ const currentUserId = computed(() => user.value?.uid || null);
 
 const hasExistingRating = ref(false);
 const isOwnCat = computed(() => !!cat.value?.addedById && cat.value.addedById === currentUserId.value);
+const hasReportedCat = ref(false);
+const reportFeedback = ref<{ type: 'success' | 'error'; text: string } | null>(null);
+const isReportModalOpen = ref(false);
+const reportReasons = ref<string[]>([]);
+const reportDetails = ref('');
+
+const reportReasonOptions = [
+	{ value: 'not-a-cat', label: 'This is not a cat' },
+	{ value: 'wrong-animal', label: 'This is another animal' },
+	{ value: 'inappropriate-photo', label: 'The photo is inappropriate' },
+	{ value: 'bad-quality', label: 'The photo is too unclear to verify' },
+	{ value: 'duplicate-or-wrong-cat', label: 'Duplicate or wrong cat photo' }
+];
 
 const formattedAverageScore = computed(() => {
 	if (!cat.value) return '0.00';
@@ -139,6 +153,95 @@ async function fetchExistingRatingForCat() {
 	hasExistingRating.value = snap.exists();
 }
 
+async function fetchExistingReportForCat() {
+	const uid = currentUserId.value;
+	if (!uid || !cat.value) {
+		hasReportedCat.value = false;
+		return;
+	}
+
+	const reportRef = doc(db, 'catReports', `${cat.value.id}_${uid}`);
+	const snap = await getDoc(reportRef);
+	hasReportedCat.value = snap.exists();
+}
+
+async function reportCat() {
+	const uid = currentUserId.value;
+	reportFeedback.value = null;
+
+	if (!cat.value) return;
+
+	if (!uid) {
+		reportFeedback.value = {
+			type: 'error',
+			text: 'Please log in to report this photo.'
+		};
+		return;
+	}
+
+	if (!reportReasons.value.length && !reportDetails.value.trim()) {
+		reportFeedback.value = {
+			type: 'error',
+			text: 'Please choose a reason or describe what is wrong.'
+		};
+		return;
+	}
+
+	try {
+		const reportRef = doc(db, 'catReports', `${cat.value.id}_${uid}`);
+		await setDoc(
+			reportRef,
+			{
+				catId: cat.value.id,
+				userId: uid,
+				reason: reportReasons.value[0] || 'other',
+				reasons: reportReasons.value,
+				details: reportDetails.value.trim(),
+				status: 'open',
+				createdAt: serverTimestamp(),
+				updatedAt: serverTimestamp()
+			},
+			{ merge: true }
+		);
+
+		hasReportedCat.value = true;
+		isReportModalOpen.value = false;
+		reportFeedback.value = {
+			type: 'success',
+			text: 'Thanks, this photo was reported for admin review.'
+		};
+	} catch (e) {
+		console.error('failed to report cat', e);
+		const message = (e as any)?.code === 'permission-denied'
+			? 'Reports are not enabled in the database rules yet. Please contact an administrator.'
+			: 'Report could not be sent. Please try again.';
+		reportFeedback.value = {
+			type: 'error',
+			text: message
+		};
+	}
+}
+
+function openReportModal() {
+	reportFeedback.value = null;
+
+	if (hasReportedCat.value) return;
+
+	if (!currentUserId.value) {
+		reportFeedback.value = {
+			type: 'error',
+			text: 'Please log in to report this photo.'
+		};
+		return;
+	}
+
+	isReportModalOpen.value = true;
+}
+
+function closeReportModal() {
+	isReportModalOpen.value = false;
+}
+
 function onRateClick() {
 	if (!cat.value) return;
 	router.push(`/cat/${cat.value.id}/rate`);
@@ -170,6 +273,7 @@ watch(
 	() => {
 		if (cat.value && currentUserId.value) {
 			fetchExistingRatingForCat();
+			fetchExistingReportForCat();
 		}
 	}
 );
@@ -192,6 +296,19 @@ watch(
 
 			<!-- left: image + author -->
 			<div class="cat-photo max-w-md">
+				<button
+					v-if="!isAdminUser"
+					type="button"
+					class="report-btn"
+					:class="{ 'report-btn--reported': hasReportedCat }"
+					:title="hasReportedCat ? 'Already reported' : 'Report photo as not a cat'"
+					:aria-label="hasReportedCat ? 'Already reported' : 'Report photo as not a cat'"
+					:disabled="hasReportedCat"
+					@click="openReportModal"
+				>
+					!
+				</button>
+
 				<img
 					v-if="cat.imageUrl"
 					:src="cat.imageUrl"
@@ -213,6 +330,58 @@ watch(
 					</span>
 					<span v-if="isAuthorVerified" class="verified-badge">Verified breeder</span>
 				</p>
+
+				<p
+					v-if="reportFeedback"
+					class="report-feedback"
+					:class="`report-feedback--${reportFeedback.type}`"
+				>
+					{{ reportFeedback.text }}
+				</p>
+			</div>
+
+			<div
+				v-if="isReportModalOpen"
+				class="report-modal-backdrop"
+				@click.self="closeReportModal"
+			>
+				<div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title">
+					<div class="report-modal-head">
+						<h2 id="report-title">Report this photo</h2>
+						<button type="button" class="report-close" aria-label="Close report dialog" @click="closeReportModal">x</button>
+					</div>
+
+					<p class="report-intro">Tell us what looks wrong. Admins will review the photo.</p>
+
+					<div class="report-options">
+						<label
+							v-for="option in reportReasonOptions"
+							:key="option.value"
+							class="report-option"
+						>
+							<input
+								v-model="reportReasons"
+								type="checkbox"
+								:value="option.value"
+							/>
+							<span>{{ option.label }}</span>
+						</label>
+					</div>
+
+					<label class="report-details">
+						<span>Additional details</span>
+						<textarea
+							v-model="reportDetails"
+							rows="3"
+							placeholder="Optional"
+						></textarea>
+					</label>
+
+					<div class="report-actions">
+						<button type="button" class="report-secondary" @click="closeReportModal">Cancel</button>
+						<button type="button" class="report-primary" @click="reportCat">Submit report</button>
+					</div>
+				</div>
 			</div>
 
 			<!-- right: info -->
@@ -285,6 +454,176 @@ watch(
 	color: #166534;
 	font-weight: 700;
 	box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.cat-photo {
+	position: relative;
+}
+
+.report-btn {
+	position: absolute;
+	top: 0.7rem;
+	right: 0.7rem;
+	z-index: 2;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 9999px;
+	border: 1px solid rgba(127, 29, 29, 0.25);
+	background: rgba(255, 255, 255, 0.92);
+	color: #b91c1c;
+	font-weight: 900;
+	line-height: 1;
+	box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+	cursor: pointer;
+}
+
+.report-btn:hover {
+	background: #fef2f2;
+	transform: translateY(-1px);
+}
+
+.report-btn--reported,
+.report-btn:disabled {
+	background: #f1f5f9;
+	color: #64748b;
+	cursor: default;
+	transform: none;
+}
+
+.report-feedback {
+	margin-top: 0.6rem;
+	padding: 0.55rem 0.75rem;
+	border-radius: 0.65rem;
+	font-size: 0.85rem;
+	font-weight: 700;
+	text-align: center;
+}
+
+.report-feedback--success {
+	background: #ecfdf5;
+	color: #166534;
+}
+
+.report-feedback--error {
+	background: #fef2f2;
+	color: #991b1b;
+}
+
+.report-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: grid;
+	place-items: center;
+	padding: 1rem;
+	background: rgba(15, 23, 42, 0.42);
+}
+
+.report-modal {
+	width: min(460px, 100%);
+	padding: 1.2rem;
+	border-radius: 1rem;
+	background: #fff;
+	box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.report-modal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.report-modal-head h2 {
+	font-size: 1.35rem;
+	font-weight: 800;
+}
+
+.report-close {
+	width: 2rem;
+	height: 2rem;
+	border: none;
+	border-radius: 999px;
+	background: #f1f5f9;
+	color: #334155;
+	font-weight: 800;
+}
+
+.report-intro {
+	margin-top: 0.35rem;
+	color: #64748b;
+}
+
+.report-options {
+	display: grid;
+	gap: 0.55rem;
+	margin-top: 1rem;
+}
+
+.report-option {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.65rem 0.75rem;
+	border-radius: 0.65rem;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	cursor: pointer;
+}
+
+.report-option input {
+	width: 1rem;
+	height: 1rem;
+	accent-color: #a855f7;
+}
+
+.report-details {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	margin-top: 1rem;
+	color: #334155;
+	font-weight: 700;
+}
+
+.report-details textarea {
+	width: 100%;
+	resize: vertical;
+	border-radius: 0.65rem;
+	border: 1px solid #cbd5e1;
+	padding: 0.65rem 0.75rem;
+	font-weight: 400;
+	outline: none;
+}
+
+.report-details textarea:focus {
+	border-color: #a855f7;
+	box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.14);
+}
+
+.report-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	margin-top: 1.1rem;
+}
+
+.report-secondary,
+.report-primary {
+	border: none;
+	border-radius: 999px;
+	padding: 0.65rem 1rem;
+	font-weight: 800;
+}
+
+.report-secondary {
+	background: #f1f5f9;
+	color: #334155;
+}
+
+.report-primary {
+	background: #a855f7;
+	color: #fff;
 }
 
 .rate-btn {

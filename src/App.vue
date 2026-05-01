@@ -13,16 +13,28 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageNavigation/>
-  <AuthSuccessOverlay/>
-  <router-view v-slot="{ Component }">
-    <transition name="fade" mode="out-in">
-      <component :is="Component"/>
-    </transition>
-  </router-view>
-  <PageFooter/>
+  <div class="app-shell">
+    <PageNavigation/>
+    <AuthSuccessOverlay/>
+    <main class="app-main">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component"/>
+        </transition>
+      </router-view>
+    </main>
+    <PageFooter/>
+  </div>
 </template>
 
 <style scoped lang="scss">
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
+.app-main {
+  flex: 1 0 auto;
+}
 </style>
