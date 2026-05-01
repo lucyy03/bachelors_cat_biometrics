@@ -67,6 +67,9 @@ onMounted(() => {
               :averageScore="cat.averageScore"
               :reviewCount="cat.reviewCount"
               :imageSrc="cat.imageUrl"
+              :imagePosX="cat.imagePosX"
+              :imagePosY="cat.imagePosY"
+              :imageScale="cat.imageScale"
           />
         </div>
       </div>

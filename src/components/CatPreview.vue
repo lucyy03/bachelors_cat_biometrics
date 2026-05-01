@@ -8,6 +8,7 @@
 				:src="imageSrc"
 				:alt="`Image of ${name}`"
 				@load="onImageLoaded"
+				:style="imageStyle"
 				:class="['content-loading', { 'is-loaded': !isImageLoading }]"
 			/>
 		</div>
@@ -69,6 +70,18 @@ export default {
 			type: String,
 			required: true
 		},
+		imagePosX: {
+			type: Number,
+			default: 50
+		},
+		imagePosY: {
+			type: Number,
+			default: 50
+		},
+		imageScale: {
+			type: Number,
+			default: 1
+		},
 
 		// 👇 NEW (optional, admin-only)
 		adminRatingDetail: {
@@ -101,6 +114,17 @@ export default {
 		},
 		formattedAverageScore() {
 			return Number(this.averageScore ?? 0).toFixed(2);
+		},
+		imageStyle() {
+			const posX = Number(this.imagePosX ?? 50);
+			const posY = Number(this.imagePosY ?? 50);
+			const scale = Number(this.imageScale ?? 1);
+
+			return {
+				objectPosition: `${posX}% ${posY}%`,
+				transform: `scale(${scale})`,
+				transformOrigin: `${posX}% ${posY}%`
+			};
 		},
 
 		// 👇 NEW: dynamic DETAIL target

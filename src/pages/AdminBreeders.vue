@@ -31,6 +31,9 @@ interface RatedCat {
 	averageScore?: number;
 	reviewCount?: number;
 	imageUrl?: string;
+	imagePosX?: number;
+	imagePosY?: number;
+	imageScale?: number;
 
 	//new
 	ratingId: string;
@@ -256,6 +259,9 @@ function formatPoints(value?: number) {
 							:averageScore="cat.averageScore ?? 0"
 							:reviewCount="cat.reviewCount ?? 0"
 							:imageSrc="cat.imageUrl || ''"
+							:imagePosX="cat.imagePosX ?? 50"
+							:imagePosY="cat.imagePosY ?? 50"
+							:imageScale="cat.imageScale ?? 1"
 							:adminRatingDetail="true"
 							:ratingId="cat.ratingId"
 						/>
