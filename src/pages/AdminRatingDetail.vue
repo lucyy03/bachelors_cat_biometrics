@@ -339,7 +339,6 @@ function goBack() {
 						<div class="divider"></div>
 
 						<div class="side-foot muted">
-							Tip: hover a criterion to see it pop.
 						</div>
 					</div>
 				</aside>

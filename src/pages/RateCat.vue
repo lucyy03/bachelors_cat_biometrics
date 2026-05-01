@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import {useRoute} from 'vue-router';
+import {useRoute, useRouter} from 'vue-router';
 import {db} from '../utils/firebaseInit';
 import {doc, getDoc, runTransaction, serverTimestamp} from 'firebase/firestore';
 import LayoutHeader from '../components/LayoutHeader.vue';
 import {useAuth} from '../utils/useAuth';
 
 const route = useRoute();
+const router = useRouter();
 const catId = route.params.id as string;
 
 const { user } = useAuth();
@@ -14,7 +15,9 @@ const currentUserId = computed(() => user.value?.uid || null);
 
 const cat = ref<any | null>(null);
 const isLoading = ref(false);
+const isSaving = ref(false);
 const error = ref<string | null>(null);
+const feedback = ref<{ type: 'success' | 'error'; text: string } | null>(null);
 
 //note:full vs short version
 const ratingVersion = ref<'full' | 'short'>('full');
@@ -246,8 +249,13 @@ async function fetchExistingRating() {
 
 async function onSubmit() {
 	const uid = currentUserId.value;
+	feedback.value = null;
+
 	if (!uid) {
-		alert('You must be logged in as breeder to rate.');
+		feedback.value = {
+			type: 'error',
+			text: 'You must be logged in as a breeder to rate this cat.'
+		};
 		return;
 	}
 
@@ -255,11 +263,21 @@ async function onSubmit() {
 		return;
 	}
 
+	if (cat.value.addedById && cat.value.addedById === uid) {
+		feedback.value = {
+			type: 'error',
+			text: 'You uploaded this cat, so you cannot rate it.'
+		};
+		return;
+	}
+
 	const ratingId = `${catId}_${uid}`;
 	const overallScore = scoreForFields(currentFields.value, ratingValues.value);
 	const scoreWeight = ratingWeightForVersion(ratingVersion.value);
+	const wasUpdating = hasExistingRating.value;
 
 	try {
+		isSaving.value = true;
 		await runTransaction(db, async (transaction) => {
 			const catRef = doc(db, 'cats', catId);
 			const ratingRef = doc(db, 'ratings', ratingId);
@@ -378,11 +396,26 @@ async function onSubmit() {
 		});
 
 		hasExistingRating.value = true;
-		alert('Rating saved.');
-		//optional: router.push(`/cat/${catId}`);
+		feedback.value = {
+			type: 'success',
+			text: wasUpdating
+				? 'Your rating was updated successfully.'
+				: 'Your rating was submitted successfully.'
+		};
+		router.push({
+			path: `/cat/${catId}`,
+			query: {
+				ratingStatus: wasUpdating ? 'updated' : 'submitted'
+			}
+		});
 	} catch (e) {
 		console.error('failed to submit rating', e);
-		alert('Failed to submit rating, please try again.');
+		feedback.value = {
+			type: 'error',
+			text: 'Failed to save the rating. Please try again.'
+		};
+	} finally {
+		isSaving.value = false;
 	}
 }
 
@@ -493,6 +526,15 @@ initRatingDefaults();
 						</button>
 					</div>
 
+					<div
+						v-if="feedback"
+						class="rating-feedback"
+						:class="`rating-feedback--${feedback.type}`"
+						role="status"
+					>
+						{{ feedback.text }}
+					</div>
+
 					<div v-for="(fields, sectionName) in groupedFields" :key="sectionName" class="rating-section">
 						<h2 class="section-title">{{ sectionName }}</h2>
 
@@ -523,8 +565,8 @@ initRatingDefaults();
 					</div>
 
                     <div class="submit-wrap">
-                        <button type="button" class="submit-btn" @click="onSubmit">
-                            {{ hasExistingRating ? 'Update rating' : 'Submit' }}
+                        <button type="button" class="submit-btn" :disabled="isSaving" @click="onSubmit">
+                            {{ isSaving ? 'Saving...' : (hasExistingRating ? 'Update rating' : 'Submit') }}
                         </button>
                     </div>
 				</section>
@@ -648,6 +690,26 @@ initRatingDefaults();
 	box-shadow: 0 0 0 2px #8a63b0;
 }
 
+.rating-feedback {
+	margin-bottom: 1.4rem;
+	padding: 0.85rem 1rem;
+	border-radius: 10px;
+	font-weight: 600;
+	box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.rating-feedback--success {
+	background: #ecfdf5;
+	border: 1px solid #86efac;
+	color: #166534;
+}
+
+.rating-feedback--error {
+	background: #fef2f2;
+	border: 1px solid #fecaca;
+	color: #991b1b;
+}
+
 .rating-section + .rating-section {
 	margin-top: 1.8rem;
 }
@@ -742,6 +804,12 @@ initRatingDefaults();
 .submit-btn:active {
 	transform: translateY(0);
 	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.submit-btn:disabled {
+	opacity: 0.7;
+	cursor: wait;
+	transform: none;
 }
 
 @media (max-width: 960px) {

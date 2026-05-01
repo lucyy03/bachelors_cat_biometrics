@@ -3,7 +3,7 @@ import { ref, watch, computed } from 'vue';
 import { db } from '../utils/firebaseInit';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../utils/useAuth';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const props = defineProps<{
 	id: string;
@@ -20,10 +20,12 @@ const currentUserRole = ref<UserRole>(null);
 const isBreeder = computed(() => currentUserRole.value === 'BREEDER');
 
 const { user } = useAuth();
+const route = useRoute();
 const router = useRouter();
 const currentUserId = computed(() => user.value?.uid || null);
 
 const hasExistingRating = ref(false);
+const isOwnCat = computed(() => !!cat.value?.addedById && cat.value.addedById === currentUserId.value);
 
 const formattedAverageScore = computed(() => {
 	if (!cat.value) return '0.00';
@@ -31,6 +33,18 @@ const formattedAverageScore = computed(() => {
 });
 
 const isAuthorVerified = computed(() => author.value?.isVerifiedBreeder === true);
+
+const ratingFeedback = computed(() => {
+	if (route.query.ratingStatus === 'submitted') {
+		return 'Your rating was submitted successfully.';
+	}
+
+	if (route.query.ratingStatus === 'updated') {
+		return 'Your rating was updated successfully.';
+	}
+
+	return null;
+});
 
 async function fetchCat(id: string) {
 	isLoading.value = true;
@@ -51,9 +65,13 @@ async function fetchCat(id: string) {
 			cat.value = catData;
 
 			if (catData.addedById) {
-				const authorSnap = await getDoc(doc(db, 'users', catData.addedById));
-				if (authorSnap.exists()) {
-					author.value = authorSnap.data();
+				try {
+					const authorSnap = await getDoc(doc(db, 'users', catData.addedById));
+					if (authorSnap.exists()) {
+						author.value = authorSnap.data();
+					}
+				} catch (authorError) {
+					console.warn('failed to load cat author details', authorError);
 				}
 			}
 		} else {
@@ -150,6 +168,10 @@ watch(
 		</div>
 
 		<div v-else-if="cat" class="cat-detail flex flex-col md:flex-row gap-8">
+			<div v-if="ratingFeedback" class="rating-feedback">
+				{{ ratingFeedback }}
+			</div>
+
 			<!-- left: image + author -->
 			<div class="cat-photo max-w-md">
 				<img
@@ -198,8 +220,12 @@ watch(
 				<p v-if="cat.comment"><strong>Comment:</strong> {{ cat.comment }}</p>
 
 				<!-- breeder-only action -->
+				<p v-if="isBreeder && isOwnCat" class="own-cat-note">
+					You uploaded this cat, so you cannot rate it.
+				</p>
+
 				<button
-					v-if="isBreeder"
+					v-else-if="isBreeder"
 					type="button"
 					class="rate-btn"
 					@click="onRateClick"
@@ -219,6 +245,18 @@ watch(
 .cat-detail {
 	max-width: 900px;
 	margin: 0 auto;
+	flex-wrap: wrap;
+}
+
+.rating-feedback {
+	width: 100%;
+	padding: 0.85rem 1rem;
+	border-radius: 10px;
+	background: #ecfdf5;
+	border: 1px solid #86efac;
+	color: #166534;
+	font-weight: 700;
+	box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .rate-btn {
@@ -236,6 +274,12 @@ watch(
 .rate-btn:hover {
 	background: #a172cc;
 	transform: translateY(-1px);
+}
+
+.own-cat-note {
+	margin-top: 1.5rem;
+	color: #7c2d12;
+	font-weight: 600;
 }
 
 .author {
