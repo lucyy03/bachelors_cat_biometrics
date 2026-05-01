@@ -95,7 +95,9 @@ export default defineComponent({
 
 		return {
 			formData: { ...initFormData },
-			breedOptions: [{ value: "ragdoll", text: "Ragdoll" }],
+			breedOptions: [
+				{ value: "ragdoll", text: "Ragdoll" }
+			],
 			genderOptions: [
 				{ value: "male", text: "Male" },
 				{ value: "female", text: "Female" },
@@ -107,21 +109,59 @@ export default defineComponent({
 				{ value: "chocolate", text: "Chocolate" },
 				{ value: "lilac", text: "Lilac" },
 				{ value: "red", text: "Red" },
-				{ value: "cream", text: "Cream" }
+				{ value: "cream", text: "Cream" },
+				{ value: "seal-tortie", text: "Seal tortie" },
+				{ value: "blue-cream", text: "Blue cream" },
+				{ value: "chocolate-tortie", text: "Chocolate tortie" },
+				{ value: "lilac-cream", text: "Lilac cream" }
 			],
 			patternOptions: [
 				{ value: "none", text: "None" },
-				{ value: "bicolor", text: "Bicolor" },
-				{ value: "mitted", text: "Mitted" },
 				{ value: "colorpoint", text: "Colorpoint" },
-				{ value: "lynx", text: "Lynx" }
+				{ value: "mitted", text: "Mitted" },
+				{ value: "bicolor", text: "Bicolor" },
+				{ value: "true-bicolor", text: "True bicolor" },
+				{ value: "high-mitted", text: "High mitted" },
+				{ value: "mid-high-white", text: "Mid/high white" },
+				{ value: "van", text: "Van" },
+				{ value: "lynx", text: "Lynx/tabby" },
+				{ value: "tortie", text: "Tortie" },
+				{ value: "torbie", text: "Torbie (tortie lynx)" },
+				{ value: "solid", text: "Solid/self" }
 			],
 			originOptions: [
-				{ value: "us", text: "USA" },
-				{ value: "uk", text: "United Kingdom" },
-				{ value: "sk", text: "Slovakia" },
+				{ value: "at", text: "Austria" },
+				{ value: "be", text: "Belgium" },
+				{ value: "bg", text: "Bulgaria" },
+				{ value: "ca", text: "Canada" },
+				{ value: "hr", text: "Croatia" },
 				{ value: "cz", text: "Czech Republic" },
-				{ value: "de", text: "Germany" }
+				{ value: "dk", text: "Denmark" },
+				{ value: "ee", text: "Estonia" },
+				{ value: "fi", text: "Finland" },
+				{ value: "fr", text: "France" },
+				{ value: "de", text: "Germany" },
+				{ value: "gr", text: "Greece" },
+				{ value: "hu", text: "Hungary" },
+				{ value: "ie", text: "Ireland" },
+				{ value: "it", text: "Italy" },
+				{ value: "lv", text: "Latvia" },
+				{ value: "lt", text: "Lithuania" },
+				{ value: "lu", text: "Luxembourg" },
+				{ value: "nl", text: "Netherlands" },
+				{ value: "no", text: "Norway" },
+				{ value: "pl", text: "Poland" },
+				{ value: "pt", text: "Portugal" },
+				{ value: "ro", text: "Romania" },
+				{ value: "sk", text: "Slovakia" },
+				{ value: "si", text: "Slovenia" },
+				{ value: "es", text: "Spain" },
+				{ value: "se", text: "Sweden" },
+				{ value: "ch", text: "Switzerland" },
+				{ value: "ru", text: "Russia" },
+				{ value: "gb", text: "United Kingdom" },
+				{ value: "us", text: "United States" },
+				{ value: "other", text: "Other / not listed" }
 			],
 			imageFile: "",
 			imagePreviewUrl: "",

@@ -46,6 +46,24 @@ const ratingFeedback = computed(() => {
 	return null;
 });
 
+const catDetails = computed(() => {
+	if (!cat.value) return [];
+
+	return [
+		{ label: 'Breed', value: cat.value.breed },
+		{ label: 'Age on photo', value: cat.value.age != null ? cat.value.age : null },
+		{ label: 'Base color', value: cat.value.baseColor },
+		{
+			label: 'Coat pattern',
+			value: cat.value.coatPattern && cat.value.coatPattern !== 'none'
+				? `${cat.value.coatPattern}${cat.value.coatPatternColor ? ` (${cat.value.coatPatternColor})` : ''}`
+				: null
+		},
+		{ label: 'Gender', value: cat.value.gender },
+		{ label: 'Origin', value: cat.value.origin }
+	].filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
+});
+
 async function fetchCat(id: string) {
 	isLoading.value = true;
 	error.value = null;
@@ -198,26 +216,35 @@ watch(
 			</div>
 
 			<!-- right: info -->
-			<div class="cat-info space-y-2">
-				<h1 class="text-2xl font-semibold">
-					{{ cat.name || 'Unnamed cat' }}
-				</h1>
+			<div class="cat-info">
+				<div class="cat-info-head">
+					<h1>{{ cat.name || 'Unnamed cat' }}</h1>
+					<span class="breed-pill">{{ cat.breed || 'Unknown breed' }}</span>
+				</div>
 
-				<p><strong>Breed:</strong> {{ cat.breed }}</p>
-				<p v-if="cat.age != null"><strong>Age on photo:</strong> {{ cat.age }}</p>
-				<p v-if="cat.baseColor"><strong>Base color:</strong> {{ cat.baseColor }}</p>
-				<p v-if="cat.coatPattern && cat.coatPattern !== 'none'">
-					<strong>Coat pattern:</strong> {{ cat.coatPattern }}
-					<span v-if="cat.coatPatternColor">({{ cat.coatPatternColor }})</span>
+				<div class="detail-grid">
+					<div
+						v-for="item in catDetails"
+						:key="item.label"
+						class="detail-card"
+					>
+						<span>{{ item.label }}</span>
+						<strong>{{ item.value }}</strong>
+					</div>
+				</div>
+
+				<div class="score-card">
+					<div>
+						<span>Average score</span>
+						<strong>{{ formattedAverageScore }} / 10</strong>
+					</div>
+					<small>{{ cat.reviewCount || 0 }} {{ (cat.reviewCount || 0) === 1 ? 'review' : 'reviews' }}</small>
+				</div>
+
+				<p v-if="cat.comment" class="comment-box">
+					<span>Comment</span>
+					{{ cat.comment }}
 				</p>
-				<p v-if="cat.gender"><strong>Gender:</strong> {{ cat.gender }}</p>
-				<p v-if="cat.origin"><strong>Country of origin/registration:</strong> {{ cat.origin }}</p>
-
-				<p>
-					<strong>Average score:</strong> {{ formattedAverageScore }} / 10 ({{ cat.reviewCount }} reviews)
-				</p>
-
-				<p v-if="cat.comment"><strong>Comment:</strong> {{ cat.comment }}</p>
 
 				<!-- breeder-only action -->
 				<p v-if="isBreeder && isOwnCat" class="own-cat-note">
@@ -243,9 +270,10 @@ watch(
 }
 
 .cat-detail {
-	max-width: 900px;
+	max-width: 980px;
 	margin: 0 auto;
 	flex-wrap: wrap;
+	align-items: flex-start;
 }
 
 .rating-feedback {
@@ -260,8 +288,9 @@ watch(
 }
 
 .rate-btn {
-	margin-top: 1.5rem;
-	padding: 0.6rem 1.4rem;
+	width: 100%;
+	margin-top: 0.5rem;
+	padding: 0.75rem 1.4rem;
 	border-radius: 9999px;
 	border: none;
 	background: #b58ad7;
@@ -277,9 +306,119 @@ watch(
 }
 
 .own-cat-note {
-	margin-top: 1.5rem;
+	margin-top: 0.5rem;
+	padding: 0.75rem 1rem;
+	border-radius: 0.75rem;
+	background: #fff7ed;
 	color: #7c2d12;
 	font-weight: 600;
+}
+
+.cat-info {
+	flex: 1;
+	min-width: 320px;
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	padding: 1.25rem;
+	border-radius: 1rem;
+	background: #ffffff;
+	box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+	border: 1px solid #ede9fe;
+}
+
+.cat-info-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+}
+
+.cat-info-head h1 {
+	font-size: 2rem;
+	font-weight: 800;
+	line-height: 1.1;
+}
+
+.breed-pill {
+	padding: 0.25rem 0.65rem;
+	border-radius: 9999px;
+	background: #f3e8ff;
+	color: #7e22ce;
+	font-weight: 700;
+	font-size: 0.85rem;
+}
+
+.detail-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.detail-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	padding: 0.75rem;
+	border-radius: 0.75rem;
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+}
+
+.detail-card span,
+.score-card span,
+.comment-box span {
+	color: #64748b;
+	font-size: 0.78rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.detail-card strong {
+	font-size: 1rem;
+	color: #111827;
+	overflow-wrap: anywhere;
+}
+
+.score-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 1rem;
+	border-radius: 0.9rem;
+	background: linear-gradient(135deg, #faf5ff, #eef2ff);
+	border: 1px solid #ddd6fe;
+}
+
+.score-card div {
+	display: flex;
+	flex-direction: column;
+	gap: 0.1rem;
+}
+
+.score-card strong {
+	font-size: 1.6rem;
+	color: #581c87;
+	line-height: 1;
+}
+
+.score-card small {
+	color: #64748b;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.comment-box {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	padding: 0.9rem;
+	border-radius: 0.75rem;
+	background: #f8fafc;
+	color: #334155;
 }
 
 .author {
@@ -302,5 +441,16 @@ watch(
 	color: #166534;
 	font-size: 0.72rem;
 	font-weight: 700;
+}
+
+@media (max-width: 720px) {
+	.detail-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.score-card {
+		align-items: flex-start;
+		flex-direction: column;
+	}
 }
 </style>
