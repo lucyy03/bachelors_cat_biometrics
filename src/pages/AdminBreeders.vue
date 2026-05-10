@@ -354,16 +354,106 @@ function formatPoints(value?: number) {
 /* rated cats section */
 .rated-section {
 	margin-top: 2.5rem;
+	max-width: 100%;
 }
 
 .rated-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-	gap: 2rem;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 1.25rem;
+	align-items: stretch;
 }
 
 .rated-card {
 	display: flex;
 	flex-direction: column;
+	min-width: 0;
+}
+
+.rated-card :deep(.cat-preview) {
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	overflow: hidden;
+	color: #1f2937;
+	text-decoration: none;
+	background: rgba(255, 255, 255, 0.94);
+	border-radius: 8px;
+	box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+.rated-card :deep(.cat-preview:hover) {
+	transform: translateY(-2px);
+}
+
+.rated-card :deep(.image-container) {
+	width: 100%;
+	min-width: 0;
+	height: auto;
+	aspect-ratio: 4 / 3;
+	flex: none;
+	background: #e2d8eb;
+}
+
+.rated-card :deep(.image-container img) {
+	width: 100%;
+	height: 100%;
+	border-radius: 8px 8px 0 0;
+}
+
+.rated-card :deep(.information) {
+	width: 100%;
+	min-width: 0;
+	flex: 1;
+	gap: 0.65rem;
+	padding: 1rem;
+}
+
+.rated-card :deep(.information .title) {
+	font-size: 1.35rem;
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.rated-card :deep(.information table) {
+	width: 100%;
+	table-layout: fixed;
+	font-size: 0.95rem;
+}
+
+.rated-card :deep(.information table tr td:first-child) {
+	width: 48%;
+}
+
+.rated-card :deep(.information table td) {
+	overflow-wrap: anywhere;
+}
+
+.rated-card :deep(.score) {
+	align-self: stretch;
+	flex: none;
+	justify-content: flex-end;
+	font-size: 1.75rem;
+	padding-bottom: 0;
+}
+
+.rated-card :deep(.score span:first-child) {
+	font-size: 0.9rem;
+}
+
+.rated-card :deep(.information button) {
+	width: 100%;
+	max-width: 100%;
+	min-height: 42px;
+	padding: 0.45rem 0.75rem;
+}
+
+@media (max-width: 640px) {
+	.rated-grid {
+		grid-template-columns: 1fr;
+	}
 }
 </style>
